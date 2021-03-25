@@ -1,0 +1,172 @@
+---
+title: UCell demo
+author: 
+- Massimo Andreatta^[massimo.andreatta@unil.ch]
+- Santiago Carmona^[santiago.carmona@unil.ch]
+date: "15/02/2021"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+#output: html_notebook
+---
+
+
+```{r message=F, warning=F}
+renv::restore()
+library(ggplot2)
+library(plotly)
+#remotes::install_github("mojaveazure/seurat-disk")
+library(SeuratDisk)
+library(Seurat)
+#remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
+library(UCell)
+library(BiocManager)
+library(AUCell)
+```
+
+
+```{r}
+pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+DimPlot(object = pbmc.Tcell, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+Define human T cell level 2 signatues
+```{r, eval=F}
+HCA.markers.Hs.Tcell <- list()
+HCA.markers.Hs.Tcell$Tcell_CD4 <- c("CD4","CD40LG")
+HCA.markers.Hs.Tcell$Tcell_CD8 <- c("CD8A","CD8B")
+HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3")
+HCA.markers.Hs.Tcell$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+HCA.markers.Hs.Tcell$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+HCA.markers.Hs.Tcell$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+saveRDS(HCA.markers.Hs.Tcell,"data/HCA.markers.Hs.Tcell.PBMC.RData")
+```
+
+
+
+```{r}
+Idents(pbmc.Tcell) <- "celltype.l1"
+pbmc.Tcell.CD8 <- subset(pbmc.Tcell, idents = c("CD8 T"))
+table(pbmc.Tcell.CD8@active.ident)
+DimPlot(object = pbmc.Tcell.CD8, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+
+```{r}
+HCA.markers.Hs.Tcell <- readRDS("data/HCA.markers.Hs.Tcell.PBMC.RData")
+pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
+VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_test1")
+
+pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
+VlnPlot(pbmc.Tcell, features = "Tcell_CD8_test1")
+```
+
+
+```{r}
+cells_rankings <- AUCell_buildRankings(pbmc.Tcell@assays$RNA@data,nCores = 1, plotStats = F)
+cells_AUC <- AUCell_calcAUC(HCA.markers.Hs.Tcell, cells_rankings, aucMaxRank=1000)
+cells_AUC.num <- getAUC(cells_AUC)
+pbmc.Tcell <- AddMetaData(pbmc.Tcell,cells_AUC.num["Tcell_CD8",],col.name = "Tcell_CD8_AUCell")
+hist(pbmc.Tcell$Tcell_CD8_AUCell)
+```
+
+```{r}
+system.time(cells_rankings2 <- AUCell_buildRankings(pbmc.Tcell.CD8@assays$RNA@data,nCores = 1, plotStats = T))
+cells_AUC2 <- AUCell_calcAUC(HCA.markers.Hs.Tcell, cells_rankings2, aucMaxRank=1000)
+cells_AUC.num2 <- getAUC(cells_AUC2)
+pbmc.Tcell.CD8 <- AddMetaData(pbmc.Tcell.CD8,cells_AUC.num2["Tcell_CD8",],col.name = "Tcell_CD8_AUCell")
+hist(pbmc.Tcell.CD8$Tcell_CD8_AUCell)
+```
+
+```{r}
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")) )
+VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")))
+VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+```
+
+```{r}
+plot(pbmc.Tcell.CD8$Tcell_CD8_test1,pbmc.Tcell.CD8$Tcell_CD8_UCell)
+plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell,pbmc.Tcell.CD8$Tcell_CD8_UCell)
+plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell,pbmc.Tcell.CD8$Tcell_CD8_test1)
+```
+
+
+#check if rank matrix is present. if not, re-calculate
+# store rank matrix in @misc
+# if vector list is unnamed, assign names signature1, 2, etc
+```{r}
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(a=c("CD8A","CD8B"),b=c("CD8A","CD8B")) )
+
+```
+
+
+
+
+```{r}
+library(data.table)
+testSamp <- c(1e3,2e3,3e3)
+#testSamp <- c(1e3,5e3,1e4)
+tt <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(tt) <- c("size","AUCell","Frank")
+
+tt2 <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(tt2) <- c("size","AUCell","Frank")
+
+
+for (i in seq_along(testSamp)[]){
+  i.samp <- testSamp[i]
+  tt[i,1] <- i.samp
+  tt2[i,1] <- i.samp
+
+  print(i.samp)
+  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
+  t <- system.time(cells_rankings <- AUCell_buildRankings(pbmc.Tcell.large@assays$RNA@data[,1:i.samp],nCores = 1, plotStats = F))
+  Rprof(NULL)
+  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
+  
+  tt[i,2] <- t[["elapsed"]]
+  tt2[i,2] <- memPeak
+  
+  print(cells_rankings[1:5,1:5])
+  
+  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
+  #t <- system.time(rnaDT.ranks <- apply(as.data.table(pbmc.Tcell.large@assays$RNA@data[,1:i.samp]),2,function(x) frank(x,ties.method="random")))
+  t1 <- system.time(dt <- as.data.table(pbmc.Tcell.large@assays$RNA@data[,1:i.samp])) #,keep.rownames=T
+  t2 <- system.time(rnaDT.ranks.dt <- dt[, lapply(.SD, function(x) frank(x,ties.method="random"))])
+  
+  #t <- system.time(rnaDT.ranks <- apply(as.data.table(pbmc.Tcell.large@assays$RNA@data[,1:i.samp]),2,function(x) frank(x,ties.method="random")))
+  rnaDT.ranks.rownames <- rownames(pbmc.Tcell.large@assays$RNA@data[,1:i.samp])
+  
+  Rprof(NULL)
+  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)  
+  print(rnaDT.ranks[1:5,1:5])
+  tt[i,3] <- t1[["elapsed"]]+t2[["elapsed"]]
+  tt2[i,3] <- memPeak
+  
+}
+
+```
+
+```{r}
+
+library(tidyr)
+
+tt.df <- tt %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
+
+ggplot(tt.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
+
+tt.df <- tt2 %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
+
+ggplot(tt.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
+
+
+#tt.df2 <- tt %>% as.data.frame() %>% mutate(diff=AUCell-Frank)
+
+
+```
+
+
