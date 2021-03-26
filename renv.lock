@@ -290,8 +290,8 @@
       "Source": "Git",
       "RemoteType": "xgit",
       "RemoteUrl": "https://gitlab.unil.ch/carmona/UCell.git",
-      "RemoteSha": "54b77200ebca503be8d18b2c9722e30cb9463f51",
-      "Hash": "49c4e2e64923118df47d40f172498bdd"
+      "RemoteSha": "15bd78ae6b26d45006043e980d8f49bcbef0f059",
+      "Hash": "726dfac4934cff6f8bb634b0e96f7b9a"
     },
     "XML": {
       "Package": "XML",
