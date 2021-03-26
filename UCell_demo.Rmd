@@ -155,17 +155,17 @@ hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",-1,
 
 Small benchmark
 ```{r}
-testSamp <- c(1e3,2e3,3e3)
+testSamp <- c(1e3,2e3,3e3,4e3)
 #testSamp <- c(1e3,5e3,1e4)
 
 features <- HCA.markers.Hs.Tcell
-obj <- pbmc.Tcell.CD8
+obj <- pbmc.Tcell
   
 time_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
-colnames(time_table) <- c("size","AUCell","Frank")
+colnames(time_table) <- c("size","AUCell","UCell")
 
 memory_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
-colnames(memory_table) <- c("size","AUCell","Frank")
+colnames(memory_table) <- c("size","AUCell","UCell")
 
 
 
@@ -219,7 +219,6 @@ memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,value
 ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
 
 
-#time_table.df2 <- time_table %>% as.data.frame() %>% mutate(diff=AUCell-Frank)
 
 
 ```
