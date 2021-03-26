@@ -192,7 +192,7 @@ for (i in seq_along(testSamp)[]){
   
   Rprof(tf <- "rprof.log", memory.profiling=TRUE)
   t <- system.time({
-    obj_out2 <- AddModuleScore_UCell(obj, features = features, maxRank = 1000)
+    obj_out2 <- AddModuleScore_UCell(obj[,1:i.samp], features = features, maxRank = 1000)
   })
   Rprof(NULL)
   
