@@ -1,0 +1,144 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
+library(UCell)
+library(Seurat)
+library(ggplot2)
+```
+
+```{r}
+pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds") #https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
+Seurat::DimPlot(object = pbmc.Tcell, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
+```
+
+Define human T cell level 2 signatues
+```{r, eval=T}
+HCA.markers.Hs.Tcell <- list()
+HCA.markers.Hs.Tcell$Tcell_CD4 <- c("CD4","CD40LG")
+HCA.markers.Hs.Tcell$Tcell_CD8 <- c("CD8A","CD8B")
+HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3")
+HCA.markers.Hs.Tcell$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+HCA.markers.Hs.Tcell$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+HCA.markers.Hs.Tcell$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+```
+
+
+
+```{r}
+Idents(pbmc.Tcell) <- "celltype.l1"
+pbmc.Tcell.CD8 <- subset(pbmc.Tcell, idents = c("CD8 T"))
+table(pbmc.Tcell.CD8@active.ident)
+DimPlot(object = pbmc.Tcell.CD8, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+
+```{r}
+pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
+VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_test1")
+
+pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
+VlnPlot(pbmc.Tcell, features = "Tcell_CD8_test1")
+```
+
+
+```{r}
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")))
+VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+#pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")))
+#VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+```
+
+
+
+
+
+Test ranks storing functionality
+
+```{r}
+pbmc.Tcell.CD8.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")), storeRanks = T)
+VlnPlot(pbmc.Tcell.CD8.UcellPrecomp, features = "Tcell_CD8_UCell")
+```
+
+
+
+```{r}
+pbmc.Tcell.CD8.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.CD8.UcellPrecomp, features = list(Tcell_CD8_copy=c("CD8A","CD8B")))
+VlnPlot(pbmc.Tcell.CD8.UcellPrecomp, features = "Tcell_CD8_copy_UCell")
+VlnPlot(pbmc.Tcell.CD8.UcellPrecomp, features = "Tcell_CD8_UCell")
+
+plot(pbmc.Tcell.CD8.UcellPrecomp$Tcell_CD8_UCell,pbmc.Tcell.CD8.UcellPrecomp$Tcell_CD8_copy_UCell)
+```
+
+
+
+
+```{r, eval=F}
+obj <- pbmc.Tcell[,1:500]
+split.data <- UCell:::split_data.matrix(matrix=obj@assays[["RNA"]]@data, chunk.size=100)
+maxRank <- 1000
+storeRanks=T
+features = list(Tcell_CD8=c("CD8A","CD8B"))
+
+ meta.list <- lapply(
+      X = split.data,
+      FUN = function(x) {
+        cells_rankings <- UCell:::data_to_ranks_data_table(x)
+        cells_AUC <- UCell:::u_stat_signature_list(features, cells_rankings, maxRank=maxRank)
+        colnames(cells_AUC) <- paste0(colnames(cells_AUC),"_UCell")
+
+        #return(cells_AUC)
+        if (storeRanks==T){
+          return(list(cells_rankings=cells_rankings[,-1],cells_AUC=cells_AUC))
+        } else {
+          return(list(cells_AUC=cells_AUC))
+        }
+      } )
+
+ 
+   cells_rankings.merge <- lapply(meta.list,function(x) rbind(x[["cells_rankings"]]))
+    cells_rankings.merge <- Reduce(cbind, cells_rankings.merge)
+    class(cells_rankings.merge)
+    dim(cells_rankings.merge)
+    
+    print(class(cells_rankings.merge))
+    print(dim(cells_rankings.merge))
+    cells_rankings.merge[cells_rankings.merge>maxRank] <- 0
+    print("3")
+    print(class(cells_rankings.merge))
+    print(dim(cells_rankings.merge))
+    cells_rankings.merge <- Matrix::Matrix(as.matrix(cells_rankings.merge),sparse = T)
+    print("4")
+    print(class(cells_rankings.merge))
+    print(dim(cells_rankings.merge))
+    
+    
+    #cells_rankings.merge <- cbind(rn=rownames(obj), cells_rankings.merge) # this is the problem of shuffling genes. data.table is sorted according to key/gene names
+    #setkey(cells_rankings.merge, rn, physical=F) #
+    #obj@misc[["UCell"]][[assay]] <- list(cells_rankings=cells_rankings.merge)
+    #cells_rankings.merge <- lapply(cells_rankings.merge,function(x) Matrix::as.matrix(x))
+    cells_rankings.merge <- Matrix::as.matrix(cells_rankings.merge)
+    class(cells_rankings.merge)
+    dim(cells_rankings.merge)
+    cells_rankings.merge[cells_rankings.merge>maxRank] <- 0
+    cells_rankings.merge <- Matrix::Matrix(cells_rankings.merge,sparse = T)
+    obj@misc[["UCell"]][[assay]] <- list(cells_rankings=cells_rankings.merge)
+    
+    #cells_rankings.merge <- cells_rankings.merge[,lapply(.SD, function(x) {x[x>1000]=0; return(x)})]
+    
+    
+
+    #cells_rankings.merge <- lapply(cells_rankings.merge,function(x) Matrix::as.matrix(x))
+    #cells_rankings.merge <- cells_rankings.merge[,lapply(.SD, function(x) {x[x>1000]=0; return(x)})]
+    #cells_rankings.merge <- Matrix::Matrix(as.matrix(cells_rankings.merge),sparse = T)
+    #obj@misc[["UCell"]][[assay]] <- list(cells_rankings=cells_rankings.merge)
+    
+    
+```
+
+
+
