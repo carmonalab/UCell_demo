@@ -17,7 +17,6 @@ Checks to do:
 
 * Reproducibility, changing seeds, chunk size, ncores
 * Accept matrix/data.frame with gene names as row names, convertible into data.table; sce object
-* make 0=0
 * check presence of features and inform % missing and that all absent will be considered as 0
 
 
@@ -37,7 +36,7 @@ library(BiocManager)
 library(AUCell)
 ```
 
-
+#Object at: https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
 ```{r}
 pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
 DimPlot(object = pbmc.Tcell, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
@@ -146,8 +145,11 @@ VlnPlot(pbmc.Tcell.UcellPrecomp, features = paste0(names(HCA.markers.Hs.Tcell),"
 Gene ranks are stored here:
 ```{r}
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings[,1:10])
-head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10,on="rn"])
-hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",-1,on="rn"]))
+head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10])
+hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",]))
+
+#head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10,on="rn"])
+#hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",-1,on="rn"]))
 ```
 
 
@@ -200,7 +202,7 @@ for (i in seq_along(testSamp)[]){
   time_table[i,3] <- t[["elapsed"]]
   memory_table[i,3] <- memPeak
   
-  print(obj_out1@meta.data[1:5,])
+#  print(obj_out1@meta.data[1:5,])
   
 }
 
