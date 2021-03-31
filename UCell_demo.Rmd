@@ -13,13 +13,6 @@ knit: (function(input_file, encoding) {
 ---
 
 
-Checks to do:
-
-* Reproducibility, changing seeds, chunk size, ncores
-* Accept matrix/data.frame with gene names as row names, convertible into data.table; sce object
-* check presence of features and inform % missing and that all absent will be considered as 0
-
-
 ```{r message=F, warning=F}
 #renv::restore()
 library(ggplot2)
@@ -29,11 +22,10 @@ library(SeuratDisk)
 library(Seurat)
 #remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
 #remotes::install_git("git@gitlab.unil.ch:carmona/UCell.git")
-#install.packages(pkgs="/Users/admin/gitlab/UCell_0.1.1.tgz",repos=NULL)
-#renv::install("/Users/admin/gitlab/UCell_0.1.1.tar.gz")
+
 
 system("R CMD build ../UCell")
-system("R CMD INSTALL UCell_0.1.1.tar.gz")
+system("R CMD INSTALL UCell_0.2.0.tar.gz")
 
 library(UCell)
 library(BiocManager)
@@ -45,6 +37,72 @@ library(AUCell)
 pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds") #https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
 DimPlot(object = pbmc.Tcell, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
 ```
+# Basic functionalities
+```{r}
+pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds") #https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
+data.matrix <- pbmc.Tcell@assays$RNA@data
+
+dim(data.matrix)
+data.matrix[1:5,1:5]
+```
+
+Calculate on the fly
+```{r}
+set.seed(123)
+basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R"))
+scores <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
+scores[1:5,]
+```
+
+Show distribution of predicted scores
+```{r}
+library(reshape2)
+melted <- melt(scores)
+colnames(melted) <- c("Cell","Signature","Uscore")
+p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature), scale = "width") +
+       geom_boxplot(width=0.1) + theme_bw()
+p
+```
+
+Pre-compute ranks
+```{r}
+set.seed(123)
+ranks <- StoreRankings_UCell(data.matrix)
+ranks[1:5,1:5]
+```
+
+Now quickly evaluate signatures from pre-stored ranks
+```{r}
+set.seed(123)
+scores.2 <- ScoreSignatures_UCell(data.matrix, features=basic.sign, precalc.ranks = ranks)
+
+scores.2[1:5,]
+
+plot(scores[,1], scores.2[,1])
+```
+
+Change seed and see effect on signature scores
+```{r}
+set.seed(999)
+scores.3 <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
+
+
+plot(scores[,1], scores.3[,1])
+```
+
+Run in parallel with multiple cores
+```{r}
+scores <- ScoreSignatures_UCell(data.matrix, features=basic.sign, ncores=4)
+
+melted <- melt(scores)
+colnames(melted) <- c("Cell","Signature","Uscore")
+p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature), scale = "width") +
+       geom_boxplot(width=0.1) + theme_bw()
+p
+```
+
+
+# Easy interaction with Seurat
 
 Define human T cell level 2 signatues
 ```{r, eval=T}
@@ -67,7 +125,7 @@ table(pbmc.Tcell.CD8@active.ident)
 DimPlot(object = pbmc.Tcell.CD8, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
 ```
 
-
+AddModuleScore from Seurat is very fast, but the score is highly dependent on the composition of the dataset
 ```{r}
 HCA.markers.Hs.Tcell <- readRDS("data/HCA.markers.Hs.Tcell.PBMC.RData")
 pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
@@ -77,8 +135,7 @@ pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8
 VlnPlot(pbmc.Tcell, features = "Tcell_CD8_test1")
 ```
 
-
-
+UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset
 ```{r}
 pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")))
 VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
@@ -88,22 +145,43 @@ VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
 
 pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), ncores=4)
 VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+```
+
+Evaluate more signatures for all flavors of T cells
+```{r}
+pbmc.Tcell.ss  <- AddModuleScore_UCell(pbmc.Tcell, features = HCA.markers.Hs.Tcell)
+sign.names <- paste0(names(HCA.markers.Hs.Tcell),"_UCell")
+VlnPlot(pbmc.Tcell.ss, features = sign.names)
+FeaturePlot(pbmc.Tcell.ss, features = sign.names)
+```
+
+Add non-existing genes
+```{r}
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B","notagene")))
+p1 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B","notagene","notagene2","notagene3")))
+p2 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("notagene","notagene2","notagene3")))
+p3 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+p1 | p2 | p3
 
 ```
 
-
-
 ```{r}
-plot(pbmc.Tcell.CD8$Tcell_CD8_test1,pbmc.Tcell.CD8$Tcell_CD8_UCell)
-plot(pbmc.Tcell$Tcell_CD8_test1,pbmc.Tcell$Tcell_CD8_UCell)
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")))
+VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+
+plot(pbmc.Tcell.CD8$Tcell_CD8_test1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
+plot(pbmc.Tcell$Tcell_CD8_test1, pbmc.Tcell$Tcell_CD8_UCell)
 
 ```
 
 
 Compare to AUCell
-
-
-
 ```{r}
 cells_rankings <- AUCell_buildRankings(pbmc.Tcell@assays$RNA@data,nCores = 1, plotStats = F)
 cells_AUC <- AUCell_calcAUC(HCA.markers.Hs.Tcell, cells_rankings, aucMaxRank=1000)
@@ -126,8 +204,11 @@ VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_AUCell")
 
 
 ```{r}
-plot(pbmc.Tcell.CD8$Tcell_CD8_test1,pbmc.Tcell.CD8$Tcell_CD8_UCell)
-plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell,pbmc.Tcell.CD8$Tcell_CD8_UCell)
+#Seurat ModuleScore vs UCell
+plot(pbmc.Tcell.CD8$Tcell_CD8_test1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
+
+#AUCell vs UCell
+plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell, pbmc.Tcell.CD8$Tcell_CD8_UCell)
 ```
 
 
@@ -142,10 +223,11 @@ pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcel
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_UCell")
 ```
 
-
+#Check that scores calculate with rank pre-calculation are the same as those calculated "on the fly"
 ```{r}
 pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = list(Tcell_CD8_copy=c("CD8A","CD8B")))
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_copy_UCell")
+
 plot(pbmc.Tcell.UcellPrecomp$Tcell_CD8_UCell,pbmc.Tcell.UcellPrecomp$Tcell_CD8_copy_UCell)
 ```
 
@@ -162,278 +244,4 @@ head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings[,1:10])
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10])
 hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",]))
 ```
-
-
-
-
-Small benchmark
-```{r}
-testSamp <- c(1e3,2e3,3e3,4e3)
-#testSamp <- c(1e3,5e3,1e4)
-
-features <- HCA.markers.Hs.Tcell
-obj <- pbmc.Tcell
-  
-time_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
-colnames(time_table) <- c("size","AUCell","UCell")
-
-memory_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
-colnames(memory_table) <- c("size","AUCell","UCell")
-
-
-
-for (i in seq_along(testSamp)[]){
-  i.samp <- testSamp[i]
-  time_table[i,1] <- i.samp
-  memory_table[i,1] <- i.samp
-
-  print(i.samp)
-  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-  t <- system.time({
-    cells_rankings <- AUCell_buildRankings(obj@assays$RNA@data[,1:i.samp],nCores = 1, plotStats = F)
-    cells_AUC <- AUCell_calcAUC(features, cells_rankings, aucMaxRank=1000)
-    cells_AUC.num <- as.data.frame(t(getAUC(cells_AUC)))
-    obj_out1 <- AddMetaData(obj,cells_AUC.num)
-    })
-  Rprof(NULL)
-  
-  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
-  time_table[i,2] <- t[["elapsed"]]
-  memory_table[i,2] <- memPeak
-  
-  print(obj_out1@meta.data[1:5,])
-  
-  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-  t <- system.time({
-    obj_out2 <- AddModuleScore_UCell(obj[,1:i.samp], features = features, maxRank = 1000)
-  })
-  Rprof(NULL)
-  
-  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)  
-  time_table[i,3] <- t[["elapsed"]]
-  memory_table[i,3] <- memPeak
-  
-#  print(obj_out1@meta.data[1:5,])
-  
-}
-
-```
-
-```{r}
-
-library(tidyr)
-
-time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
-
-ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
-ggsave("plots/benchmark_time_direct.pdf")
-memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
-
-ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
-ggsave("plots/benchmark_mem_direct.pdf")
-
-
-
-```
-
-
-Multi-core benchmark
-Vary chunk size
-
-
-Small benchmark with ranks pre-computing
-```{r}
-#testSamp <- c(100, 1e3,2e3,3e3,4e3,5e3, 9000)
-testSamp <- c(100, 1e3,2e3,3e3)
-chunk.size <- 1000
-#testSamp <- c(1e3,5e3,1e4)
-
-features <- HCA.markers.Hs.Tcell
-
-time_table <- matrix(NA,nrow = length(testSamp),ncol = 4)
-colnames(time_table) <- c("size","AUCell","UCell","AddModuleScore")
-
-memory_table <- matrix(NA,nrow = length(testSamp),ncol = 4)
-colnames(memory_table) <- c("size","AUCell","UCell","AddModuleScore")
-
-for (i in seq_along(testSamp)[]){
-  i.samp <- testSamp[i]
-  time_table[i,1] <- i.samp
-  memory_table[i,1] <- i.samp
-
-  
-  obj <- pbmc.Tcell[,1:i.samp]
-  obj_UCell <- AddModuleScore_UCell(obj, features = features, maxRank = 1000,storeRanks = T)
-  obj_AUCell <-  AUCell_buildRankings(obj@assays$RNA@data,nCores = 1, plotStats = F)
-
-  print(i.samp)
-  
-  #RUN AUCell
-  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-  t <- system.time({
-    cells_rankings <- obj_AUCell
-    cells_AUC <- AUCell_calcAUC(features, cells_rankings, aucMaxRank=1000)
-    cells_AUC.num <- as.data.frame(t(getAUC(cells_AUC)))
-    obj_out1 <- AddMetaData(obj,cells_AUC.num)
-    })
-  Rprof(NULL)
-  
-  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
-  time_table[i,2] <- t[["elapsed"]]
-  memory_table[i,2] <- memPeak
-  
-  print(obj_out1@meta.data[1:5,])
-  
-  #RUN UCell
-
-  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-  t <- system.time({
-    obj_out2 <- AddModuleScore_UCell(obj_UCell, features = features, maxRank = 1000, chunk.size = chunk.size)
-  })
-  Rprof(NULL)
-  
-  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)  
-  time_table[i,3] <- t[["elapsed"]]
-  memory_table[i,3] <- memPeak
-  
-  print(obj_out2@meta.data[1:5,])
-  
- #RUN AddModuleScore
-  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-  t <- system.time({
-       obj_out3 <- AddModuleScore(obj,features = features)
-    })
-  Rprof(NULL)
-  
-  memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
-  time_table[i,4] <- t[["elapsed"]]
-  memory_table[i,4] <- memPeak
-  
-  print(obj_out3@meta.data[1:5,])
-  
-  
-}
-
-```
-
-
-
-```{r}
-time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
-ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
-ggsave("plots/benchmark_time_precomp.pdf")
-
-memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
-ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
-ggsave("plots/benchmark_mem_precomp.pdf")
-
-```
-
-Small benchmark with ranks pre-computing (using gc())
-```{r}
-testSamp <- c(100, 500, 1e3,2e3,3e3,4e3,5e3, 9000)
-#testSamp <- c(100, 1e3,2e3,3e3)
-chunk.size <- 1000
-
-features <- HCA.markers.Hs.Tcell
-
-time_table <- matrix(NA,nrow = length(testSamp),ncol = 4)
-colnames(time_table) <- c("size","AUCell","UCell","AddModuleScore")
-
-memory_table <- matrix(NA,nrow = length(testSamp),ncol = 4)
-colnames(memory_table) <- c("size","AUCell","UCell","AddModuleScore")
-
-for (i in seq_along(testSamp)[]){
-  i.samp <- testSamp[i]
-  time_table[i,1] <- i.samp
-  memory_table[i,1] <- i.samp
-
-  
-  obj <- pbmc.Tcell[,1:i.samp]
-  obj_UCell <- AddModuleScore_UCell(obj, features = features, maxRank = 1000,storeRanks = T)
-  obj_AUCell <-  AUCell_buildRankings(obj@assays$RNA@data,nCores = 1, plotStats = F)
-
-  print(i.samp)
-  
-  #RUN AUCell
-  
-  gc1 <- gc(reset = TRUE)
-  t <- system.time({
-    cells_rankings <- obj_AUCell
-    cells_AUC <- AUCell_calcAUC(features, cells_rankings, aucMaxRank=1000)
-    cells_AUC.num <- as.data.frame(t(getAUC(cells_AUC)))
-    obj_out1 <- AddMetaData(obj,cells_AUC.num)
-    })
-  gc2 <- gc()
-  memPeak <- sum(gc2[,7]) - sum(gc1[,7])
-  
-  time_table[i,2] <- t[["elapsed"]]
-  memory_table[i,2] <- memPeak
-  
-  print(obj_out1@meta.data[1:5,])
-  
-  #RUN UCell
-  
-  gc1 <- gc(reset = TRUE)
-  t <- system.time({
-    obj_out2 <- AddModuleScore_UCell(obj_UCell, features = features, maxRank = 1000, chunk.size = chunk.size)
-  })
-  gc2 <- gc()
-  memPeak <- sum(gc2[,7]) - sum(gc1[,7])
-  
-  time_table[i,3] <- t[["elapsed"]]
-  memory_table[i,3] <- memPeak
-  
-  print(obj_out2@meta.data[1:5,])
-  
- #RUN AddModuleScore
-  gc1 <- gc(reset = TRUE)
-  t <- system.time({
-       obj_out3 <- AddModuleScore(obj,features = features)
-    })
-  gc2 <- gc()
-  memPeak <- sum(gc2[,7]) - sum(gc1[,7])
-  
-  time_table[i,4] <- t[["elapsed"]]
-  memory_table[i,4] <- memPeak
-  
-  print(obj_out3@meta.data[1:5,])
-  
-  
-}
-
-```
-
-
-```{r}
-time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
-ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
-ggsave("plots/benchmark_time_precomp.gc.png")
-
-memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
-ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
-ggsave("plots/benchmark_memory_precomp.gc.png")
-
-```
-
-
-```{r eval=F}
-testSamp <- c(100, 1e3,2e3,3e3,4e3,5e3, 9000)
-
-chunk.size <- 1000
-features <- HCA.markers.Hs.Tcell
-
-i <- 6
-i.samp <- testSamp[i]
-
-obj <- pbmc.Tcell[,1:i.samp]
-obj_UCell <- AddModuleScore_UCell(obj, features = features, maxRank = 1000,storeRanks = T)
-
-profvis({
-obj_out2 <- AddModuleScore_UCell(obj_UCell, features = features, maxRank = 1000, chunk.size = chunk.size)
-})
-
-```
-
-
 
