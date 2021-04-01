@@ -45,7 +45,8 @@ Run gc(): you will see that "gc trigger", the threshold of memory that prompts g
 
 
 ```{r}
-Sys.getenv("R_MAX_VSIZE")
+max_ram <- Sys.getenv("R_MAX_VSIZE")
+max_ram
 Sys.getenv("R_GC_MEM_GROW")
 ```
 
@@ -169,22 +170,27 @@ time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to
 memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
 memory_table.df$memory <- memory_table.df$memory/1000  #Convert to Gb
 
+max_ram_int <- as.numeric(gsub("(\\d+)Gb", "\\1", max_ram))
+min_ram_int <- min(memory_table.df$memory, na.rm = T)
+
 colors <- c("#eba223","#23a5eb")
 ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name)) + 
   scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Time (seconds)") + 
-  scale_color_manual(values=colors) + theme_bw()
-ggsave("plots/benchmark_time_direct.16GB.png", height=4, width=5)
+  scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+ggsave(sprintf("plots/benchmark_time_direct.%iGB.png", max_ram_int), height=4, width=5)
 
 
 ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + 
-  scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Memory (GB)") + 
-  scale_color_manual(values=colors) + theme_bw()
-ggsave("plots/benchmark_mem_direct.16GB.png", height=4, width=5)
+  scale_x_log10() + scale_y_log10(limits = c(min_ram_int,max_ram_int)) + xlab("Size (# cells)") + ylab("Memory (GB)") + 
+  scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+ggsave(sprintf("plots/benchmark_mem_direct.%iGB.png", max_ram_int), height=4, width=5)
 
 ```
 
 
 Benchmark using Rprof (does not account for memory deallocations)
+
+We can see the (total allocated) memory surpasses by a large amount the available RAM...
 ```{r eval=F}
 library(tidyr)
 
@@ -269,14 +275,20 @@ for (i in seq_along(testSamp)[]){
 
 #Print results
 time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
-
-ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
-ggsave("plots/benchmark_time_Rprof.16GB.png", height=4, width=5)
 memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
+memory_table.df$memory <- memory_table.df$memory/1000  #Convert to Gb
 
-ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
-ggsave("plots/benchmark_mem_Rprof.16GB.png", height=4, width=5)
+colors <- c("#eba223","#23a5eb")
+ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name)) + 
+  scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+ggsave("plots/benchmark_time_Rprof.8GB.png", height=4, width=5)
 
+
+ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + 
+  scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Memory (GB)") + 
+  scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+ggsave("plots/benchmark_mem_Rprof.8GB.png", height=4, width=5)
 
 ```
 

@@ -106,7 +106,7 @@ saveRDS(HCA.markers.Hs.Tcell,"data/HCA.markers.Hs.Tcell.PBMC.RData")
 
 Is gc() doing what it is supposed to?
 We measure everything that happens between gc1 and gc2
-```{r}
+```{r eval=F}
 cat("Load an object (memory in MB)\n")
 gc1 <- gc(reset = TRUE)
 
@@ -210,7 +210,7 @@ memPeak
 ```
 
 
-AUCell breaks from 10,000 cells on simulated small machine (8 GB RAM)
+AUCell breaks from 20,000 cells on simulated small machine (8 GB RAM)
 AUCell breaks from 50,000 cells on simulated intermediate machine (16 GB RAM)
 AUCell breaks with 150,000 cells even on very large machine (128 GB RAM)
 ```{r eval=T}
