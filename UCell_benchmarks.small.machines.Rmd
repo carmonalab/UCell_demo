@@ -1,0 +1,287 @@
+---
+title: UCell demo
+author: 
+- Massimo Andreatta^[massimo.andreatta@unil.ch]
+- Santiago Carmona^[santiago.carmona@unil.ch]
+date: "15/02/2021"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+#output: html_notebook
+---
+
+
+```{r message=F, warning=F}
+#renv::restore()
+library(ggplot2)
+library(plotly)
+#remotes::install_github("mojaveazure/seurat-disk")
+library(SeuratDisk)
+library(Seurat)
+#remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
+#remotes::install_git("git@gitlab.unil.ch:carmona/UCell.git")
+
+#system("R CMD build ../UCell")
+#system("R CMD INSTALL UCell_0.2.0.tar.gz")
+
+library(UCell)
+library(BiocManager)
+library(AUCell)
+```
+
+#Limit amount of available memory (simulate smaller machine)
+
+I cannot find a way to do this interactively
+But we can set a memory limit in .Renviron (local for this project) to e.g. R_MAX_VSIZE=8Gb
+Then re-run code, to see the effect on performance
+#NB! remember to comment out R_MAX_VSIZE after you're done!
+
+Also consider variable R_GC_MEM_GROW:
+"The strategy used for growth can be specified by setting the environment variable R_GC_MEM_GROW to an integer value between 0 and 3. This variable is read at start-up. Higher values grow the heap more aggressively, thus reducing garbage collection time but using more memory."
+
+Run gc(): you will see that "gc trigger", the threshold of memory that prompts garbage collection, is equal to the limit in Mb for a small machine (e.g. 8GB). It's tricky to set a good value for R_GC_MEM_GROW because "gc trigger" depends on current load on the system and will change with time...
+
+
+```{r}
+Sys.getenv("R_MAX_VSIZE")
+Sys.getenv("R_GC_MEM_GROW")
+```
+
+#Do not load full data here.
+Prepare subsets for future use, then do not run that section.
+
+Problem: complete seurat object is 7.5GB, expression matrix is 3.8GB. There are very large objects on a small machine, and may
+distort the memory benchmark for small subsamples. Possible solution, reload at each step only the sub-object with the size to be evaluated, and discard 
+the complete object. Also test effect on gc trigger, since less memory is used just to store the large initial objects.
+```{r eval=F}
+exp.matrix <- readRDS("data/pbmc.expmat.rds")
+
+sizes <- c(100, 200, 500, 1000, 2000, 5000, 1e4, 2e4, 5e4, 1e5)
+
+for (size in sizes) {
+   matrix.sub <- sprintf("data/sub/pbmc.expmat.%i.rds",size)
+   this <- exp.matrix[,1:size]
+   saveRDS(this, matrix.sub)
+}
+
+```
+
+Define signatures for human T cell subtypes
+```{r, eval=T}
+HCA.markers.Hs.Tcell <- list()
+HCA.markers.Hs.Tcell$Tcell_CD4 <- c("CD4","CD40LG")
+HCA.markers.Hs.Tcell$Tcell_CD8 <- c("CD8A","CD8B")
+HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3","IL2RA")
+HCA.markers.Hs.Tcell$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+HCA.markers.Hs.Tcell$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+HCA.markers.Hs.Tcell$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+```
+
+
+```{r eval=T}
+library(tidyr)
+
+#testSamp <- c(100,1000,2000,3000)
+#testSamp <- c(100,1000,2000,5000, 1e4)
+testSamp <- c(100, 200, 500, 1000, 2000, 5000, 1e4, 2e4, 5e4, 1e5)
+chunk.size <- 1000
+force.gc <- FALSE
+#gcinfo(TRUE)
+
+features <- HCA.markers.Hs.Tcell
+  
+time_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(time_table) <- c("size","AUCell","UCell")
+
+memory_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(memory_table) <- c("size","AUCell","UCell")
+gc()  #check triggers
+
+for (i in seq_along(testSamp)[]){
+  size <- testSamp[i]
+  time_table[i,1] <- size
+  memory_table[i,1] <- size
+  
+  matrix.sub <- sprintf("data/sub/pbmc.expmat.%i.rds",size)
+  this.data <- readRDS(matrix.sub)
+  
+  print(size)
+  
+  gc1 <- gc(reset = TRUE)
+  t <- system.time({
+    
+    out <- tryCatch({
+       scores_UCell <- ScoreSignatures_UCell(this.data, features = features, chunk.size = chunk.size, force.gc = force.gc)
+       1
+    },
+    error=function(cond) {
+      message(cond)
+      return(NA)
+    })
+  })
+  gc2 <- gc()
+  if (is.na(out)) { #Out of memory
+    memPeak <- NA
+    time <- NA
+  } else {
+    memPeak <- sum(gc2[,7]) - sum(gc1[,7])
+    time <- t[["elapsed"]]
+  }
+  
+  time_table[i,3] <- time
+  memory_table[i,3] <- memPeak
+  
+  
+  gc1 <- gc(reset = TRUE)
+  t <- system.time({
+    
+    out <- tryCatch({
+      cells_rankings <- AUCell_buildRankings(this.data, nCores = 1, plotStats = F)
+      cells_AUC <- AUCell_calcAUC(features, cells_rankings, aucMaxRank=1000)
+      scores_AUC <- as.data.frame(t(getAUC(cells_AUC)))
+      1
+    },
+    error=function(cond) {
+      message(cond)
+      return(NA)
+    })
+    
+  })
+  gc2 <- gc()
+  if (is.na(out)) { #Out of memory
+    memPeak <- NA
+    time <- NA
+  } else {
+    memPeak <- sum(gc2[,7]) - sum(gc1[,7])
+    time <- t[["elapsed"]]
+  }
+  
+  time_table[i,2] <- time
+  memory_table[i,2] <- memPeak
+  
+}
+#gcinfo(FALSE)
+
+#Print results
+time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
+memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
+memory_table.df$memory <- memory_table.df$memory/1000  #Convert to Gb
+
+colors <- c("#eba223","#23a5eb")
+ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name)) + 
+  scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + theme_bw()
+ggsave("plots/benchmark_time_direct.16GB.png", height=4, width=5)
+
+
+ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + 
+  scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Memory (GB)") + 
+  scale_color_manual(values=colors) + theme_bw()
+ggsave("plots/benchmark_mem_direct.16GB.png", height=4, width=5)
+
+```
+
+
+Benchmark using Rprof (does not account for memory deallocations)
+```{r eval=F}
+library(tidyr)
+
+#testSamp <- c(100,1000,2000,3000)
+testSamp <- c(100,1000,2000,5000, 1e4)
+#testSamp <- c(100, 200, 500, 1000, 2000, 5000, 1e4, 2e4, 5e4, 1e5)
+chunk.size <- 1000
+force.gc <- FALSE
+#gcinfo(TRUE)
+
+features <- HCA.markers.Hs.Tcell
+  
+time_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(time_table) <- c("size","AUCell","UCell")
+
+memory_table <- matrix(NA,nrow = length(testSamp),ncol = 3)
+colnames(memory_table) <- c("size","AUCell","UCell")
+gc()  #check triggers
+
+for (i in seq_along(testSamp)[]){
+  size <- testSamp[i]
+  time_table[i,1] <- size
+  memory_table[i,1] <- size
+  
+  matrix.sub <- sprintf("data/sub/pbmc.expmat.%i.rds",size)
+  this.data <- readRDS(matrix.sub)
+  
+  print(size)
+  
+  
+  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
+  t <- system.time({
+    out <- tryCatch({
+       scores_UCell <- ScoreSignatures_UCell(this.data, features = features, chunk.size = chunk.size, force.gc = force.gc)
+       1
+    },
+    error=function(cond) {
+      message(cond)
+      return(NA)
+    })
+  })
+  Rprof(NULL)
+  
+  if (is.na(out)) { #Out of memory
+    memPeak <- NA
+    time <- NA
+  } else {
+    memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
+    time <- t[["elapsed"]]
+  }
+  
+  time_table[i,3] <- time
+  memory_table[i,3] <- memPeak
+  
+  Rprof(tf <- "rprof.log", memory.profiling=TRUE)
+  t <- system.time({
+    
+    out <- tryCatch({
+      cells_rankings <- AUCell_buildRankings(this.data, nCores = 1, plotStats = F)
+      cells_AUC <- AUCell_calcAUC(features, cells_rankings, aucMaxRank=1000)
+      scores_AUC <- as.data.frame(t(getAUC(cells_AUC)))
+      1
+    },
+    error=function(cond) {
+      message(cond)
+      return(NA)
+    })
+    
+  })
+   Rprof(NULL)
+  if (is.na(out)) { #Out of memory
+    memPeak <- NA
+    time <- NA
+  } else {
+    memPeak <- max(summaryRprof("Rprof.log", memory="both")$by.total$mem.total)
+    time <- t[["elapsed"]]
+  }
+  
+  time_table[i,2] <- time
+  memory_table[i,2] <- memPeak
+}
+
+#Print results
+time_table.df <- time_table %>% as.data.frame() %>% pivot_longer(-size,values_to="time") 
+
+ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name))
+ggsave("plots/benchmark_time_Rprof.16GB.png", height=4, width=5)
+memory_table.df <- memory_table %>% as.data.frame() %>% pivot_longer(-size,values_to="memory") 
+
+ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + ylim(c(0,NA))
+ggsave("plots/benchmark_mem_Rprof.16GB.png", height=4, width=5)
+
+
+```
+
+
+
+
+
+

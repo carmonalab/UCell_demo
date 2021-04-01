@@ -86,8 +86,8 @@ Change seed and see effect on signature scores
 set.seed(999)
 scores.3 <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
 
-
 plot(scores[,1], scores.3[,1])
+plot(scores[,2], scores.3[,2])
 ```
 
 Run in parallel with multiple cores
@@ -109,7 +109,7 @@ Define human T cell level 2 signatues
 HCA.markers.Hs.Tcell <- list()
 HCA.markers.Hs.Tcell$Tcell_CD4 <- c("CD4","CD40LG")
 HCA.markers.Hs.Tcell$Tcell_CD8 <- c("CD8A","CD8B")
-HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3")
+HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3","IL2RA")
 HCA.markers.Hs.Tcell$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
 HCA.markers.Hs.Tcell$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
 HCA.markers.Hs.Tcell$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
@@ -148,11 +148,20 @@ VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
 ```
 
 Evaluate more signatures for all flavors of T cells
-```{r}
+```{r fig.height=3}
 pbmc.Tcell.ss  <- AddModuleScore_UCell(pbmc.Tcell, features = HCA.markers.Hs.Tcell)
 sign.names <- paste0(names(HCA.markers.Hs.Tcell),"_UCell")
+
 VlnPlot(pbmc.Tcell.ss, features = sign.names)
-FeaturePlot(pbmc.Tcell.ss, features = sign.names)
+VlnPlot(pbmc.Tcell.ss, features = sign.names, group.by = "celltype.l2")
+```
+
+How do signatures compare to original annotations
+```{r fig.height=3.5}
+Idents(pbmc.Tcell.ss) <- "celltype.l2"
+DimPlot(object = pbmc.Tcell.ss, reduction = "umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
+DimPlot(object = pbmc.Tcell.ss, reduction = "umap", split.by = "celltype.l2", label.size = 3, repel = TRUE, ncol=4)
+FeaturePlot(pbmc.Tcell.ss, features = sign.names, ncol=3, order=T)
 ```
 
 Add non-existing genes

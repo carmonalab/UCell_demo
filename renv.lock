@@ -286,12 +286,9 @@
     },
     "UCell": {
       "Package": "UCell",
-      "Version": "0.1.0",
-      "Source": "Git",
-      "RemoteType": "xgit",
-      "RemoteUrl": "https://gitlab.unil.ch/carmona/UCell.git",
-      "RemoteSha": "15bd78ae6b26d45006043e980d8f49bcbef0f059",
-      "Hash": "726dfac4934cff6f8bb634b0e96f7b9a"
+      "Version": "0.2.0",
+      "Source": "unknown",
+      "Hash": "c3ae61a7c70f6ab72a9e582a35f2eeb7"
     },
     "XML": {
       "Package": "XML",
@@ -480,6 +477,20 @@
       "Repository": "CRAN",
       "Hash": "a0cbe758a531d054b537d16dff4d58a1"
     },
+    "doParallel": {
+      "Package": "doParallel",
+      "Version": "1.0.16",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2dc413572eb42475179bfe0afabd2adf"
+    },
+    "doRNG": {
+      "Package": "doRNG",
+      "Version": "1.8.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a32487a942bdf5fd34224ad46f786e67"
+    },
     "dplyr": {
       "Package": "dplyr",
       "Version": "1.0.5",
@@ -535,6 +546,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "8e9ca89621f9304a553e0ff119328053"
+    },
+    "foreach": {
+      "Package": "foreach",
+      "Version": "1.5.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "e32cfc0973caba11b65b1fa691b4d8c9"
     },
     "fs": {
       "Package": "fs",
@@ -709,6 +727,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "b2008df40fb297e3fef135c7e8eeec1a"
+    },
+    "iterators": {
+      "Package": "iterators",
+      "Version": "1.0.13",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "64778782a89480e9a644f69aad9a2877"
     },
     "jquerylib": {
       "Package": "jquerylib",
@@ -996,6 +1021,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "edbf4cb1aefae783fd8d3a008ae51943"
+    },
+    "rngtools": {
+      "Package": "rngtools",
+      "Version": "1.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ee3ca1cacd13e35dbb71ac1999d98cbc"
     },
     "rpart": {
       "Package": "rpart",
