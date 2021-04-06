@@ -12,10 +12,7 @@ seed <- as.numeric(args[6])
 
 chunk.size <- 1000
 force.gc <- FALSE
-
-
-Sys.setenv("R_MAX_VSIZE" = ram)
-print(Sys.getenv("R_MAX_VSIZE"))
+size <- formatC(size, format="d")
 
 #Use these signatures
 ft <- list()

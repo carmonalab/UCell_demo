@@ -15,17 +15,12 @@ knit: (function(input_file, encoding) {
 
 ```{r message=F, warning=F}
 #renv::restore()
-library(ggplot2)
-library(plotly)
-#remotes::install_github("mojaveazure/seurat-disk")
-library(SeuratDisk)
 library(Seurat)
-#remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
-#remotes::install_git("git@gitlab.unil.ch:carmona/UCell.git")
+#Development moved to GitHub
+remotes::install_github("carmonalab/UCell")
 
-
-system("R CMD build ../UCell")
-system("R CMD INSTALL UCell_0.2.0.tar.gz")
+#system("R CMD build ../UCell")
+#system("R CMD INSTALL UCell_0.2.0.tar.gz")
 
 library(UCell)
 library(BiocManager)
@@ -34,12 +29,11 @@ library(AUCell)
 
 #Object at: https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
 ```{r}
-pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds") #https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
-DimPlot(object = pbmc.Tcell, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
 ```
 # Basic functionalities
 ```{r}
-pbmc.Tcell <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds") #https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
 data.matrix <- pbmc.Tcell@assays$RNA@data
 
 dim(data.matrix)
@@ -79,6 +73,17 @@ scores.2 <- ScoreSignatures_UCell(data.matrix, features=basic.sign, precalc.rank
 scores.2[1:5,]
 
 plot(scores[,1], scores.2[,1])
+
+
+new.sign <- list( CD4_Tcell = c("CD4","CD40LG"), CD8_Tcell = c("CD8A","CD8B"), Treg = c("FOXP3","IL2RA"))
+scores.new <- ScoreSignatures_UCell(data.matrix, features=new.sign, precalc.ranks = ranks)
+
+scores.new[1:5,]
+melted <- melt(scores.new)
+colnames(melted) <- c("Cell","Signature","Uscore")
+p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature), scale = "width") +
+       geom_boxplot(width=0.1) + theme_bw()
+p
 ```
 
 Change seed and see effect on signature scores
@@ -122,7 +127,7 @@ saveRDS(HCA.markers.Hs.Tcell,"data/HCA.markers.Hs.Tcell.PBMC.RData")
 Idents(pbmc.Tcell) <- "celltype.l1"
 pbmc.Tcell.CD8 <- subset(pbmc.Tcell, idents = c("CD8 T"))
 table(pbmc.Tcell.CD8@active.ident)
-DimPlot(object = pbmc.Tcell.CD8, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+DimPlot(object = pbmc.Tcell.CD8, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
 ```
 
 AddModuleScore from Seurat is very fast, but the score is highly dependent on the composition of the dataset
@@ -133,17 +138,22 @@ VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_test1")
 
 pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
 VlnPlot(pbmc.Tcell, features = "Tcell_CD8_test1")
+
+summary(pbmc.Tcell.CD8$Tcell_CD8_test1)
+summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_test1)
+
 ```
 
 UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset
 ```{r}
-pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")))
+gene.sets <- list(Tcell_CD8=c("CD8A","CD8B"))
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = gene.sets)
 VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
 
-pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")))
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets)
 VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
 
-pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), ncores=4)
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets, ncores=4)
 VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
 ```
 
@@ -157,11 +167,11 @@ VlnPlot(pbmc.Tcell.ss, features = sign.names, group.by = "celltype.l2")
 ```
 
 How do signatures compare to original annotations
-```{r fig.height=3.5}
+```{r fig.height=3}
 Idents(pbmc.Tcell.ss) <- "celltype.l2"
-DimPlot(object = pbmc.Tcell.ss, reduction = "umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
-DimPlot(object = pbmc.Tcell.ss, reduction = "umap", split.by = "celltype.l2", label.size = 3, repel = TRUE, ncol=4)
-FeaturePlot(pbmc.Tcell.ss, features = sign.names, ncol=3, order=T)
+DimPlot(object = pbmc.Tcell.ss, reduction = "wnn.umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
+#DimPlot(object = pbmc.Tcell.ss, reduction = "wnn.umap", split.by = "celltype.l2", label.size = 3, repel = TRUE, ncol=4)
+FeaturePlot(pbmc.Tcell.ss, reduction = "wnn.umap", features = sign.names, ncol=3, order=T)
 ```
 
 Add non-existing genes
