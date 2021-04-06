@@ -27,11 +27,12 @@ library(plotly)
 #remotes::install_github("mojaveazure/seurat-disk")
 library(SeuratDisk)
 library(Seurat)
-#remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
 #remotes::install_git("git@gitlab.unil.ch:carmona/UCell.git")
+#Development moved to GitHub
+remotes::install_github("carmonalab/UCell")
 
-system("R CMD build ../UCell")
-system("R CMD INSTALL UCell_0.2.0.tar.gz")
+#system("R CMD build ../UCell")
+#system("R CMD INSTALL UCell_0.2.0.tar.gz")
 
 library(UCell)
 library(BiocManager)

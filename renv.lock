@@ -287,8 +287,14 @@
     "UCell": {
       "Package": "UCell",
       "Version": "0.2.0",
-      "Source": "unknown",
-      "Hash": "c3ae61a7c70f6ab72a9e582a35f2eeb7"
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "UCell",
+      "RemoteUsername": "carmonalab",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "c95bc25599fe96a0ec3182738b92bc1fc449d082",
+      "Hash": "0ab9baf24879363dcff73c31aec72838"
     },
     "XML": {
       "Package": "XML",
@@ -986,6 +992,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "5e3c5dc0b071b21fa128676560dbe94d"
+    },
+    "remotes": {
+      "Package": "remotes",
+      "Version": "2.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "430a0908aee75b1fcba0e62857cab0ce"
     },
     "renv": {
       "Package": "renv",
