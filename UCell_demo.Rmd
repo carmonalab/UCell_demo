@@ -20,10 +20,9 @@ library(Seurat)
 remotes::install_github("carmonalab/UCell")
 
 #system("R CMD build ../UCell")
-#system("R CMD INSTALL UCell_0.2.0.tar.gz")
+#system("R CMD INSTALL UCell_0.2.1.tar.gz")
 
 library(UCell)
-library(BiocManager)
 library(AUCell)
 ```
 
@@ -262,5 +261,13 @@ Gene ranks are stored here:
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings[,1:10])
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10])
 hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",]))
+```
+
+Export small subset as sample data for the package
+```{r}
+Idents(pbmc.Tcell) <- "celltype.l1"
+pbmc.ds <- subset(pbmc.Tcell, cells=WhichCells(pbmc.Tcell,downsample=200))
+sample.matrix <- pbmc.ds@assays$RNA@data
+save(sample.matrix, file="sample.matrix.RData")
 ```
 

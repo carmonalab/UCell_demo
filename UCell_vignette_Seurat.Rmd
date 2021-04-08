@@ -1,0 +1,174 @@
+---
+title: UCell signature enrichment - interacting with Seurat
+author: "M. Andreatta and S. Carmona"
+date: "06/04/2021"
+output:
+  rmdformats::readthedown:
+    self-contained: true
+    highlight: haddock
+    thumbnails: false
+    css: styles.css
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file, encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_Seurat_vignette.html'))})
+---
+
+```{r setup, echo=FALSE, message=F, warning=F, results=F}
+#install.packages("rmdformats")
+#Template markdown setup
+library(knitr)
+library(rmdformats)
+library(formatR)
+library(renv)
+renv::restore()
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               cache.lazy=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               dev='png')
+opts_knit$set(width=75)
+
+```
+
+In this demo, we will apply UCell to evaluate gene signatures in single-cell PBMC data. We will use a subset of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1), which comprises multiple immune cell types at different levels of resolution. Because these cells were characterized both in terms of transciptomes (using scRNAseq) and surface proteins (using a panel of antibodies), the cell type annotations should be of very high quality. To demonstrate how UCell can simply and accurately evaluate gene signatures on a query dataset, we will apply it directly to the Seurat object from Hao et al. and compare the signature scores to the original cluster annotations by the authors.
+
+## Installation
+
+Install UCell
+```{r message=F, warning=F, results=F}
+remotes::install_github("carmonalab/UCell")
+
+library(Seurat)
+library(UCell)
+set.seed(123)
+```
+
+## Query single-cell data
+
+Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A](pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds) -- 20,000 T cells  
+
+Then load the object and visualize the clustering annotation by the authors.
+```{r}
+pbmc.Tcell <- readRDS("pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
+```
+
+## Score signatures using UCell
+
+Define some signatures for T cell subtypes
+```{r, eval=T}
+markers <- list()
+markers$Tcell_CD4 <- c("CD4","CD40LG")
+markers$Tcell_CD8 <- c("CD8A","CD8B")
+markers$Tcell_Treg <- c("FOXP3","IL2RA")
+markers$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+```
+
+```{r fig.height=6, fig.width=10}
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers)
+signature.names <- paste0(names(markers),"_UCell")
+
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l1")
+```
+
+```{r fig.height=6, fig.width=10}
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l2")
+```
+
+How do signatures compare to original annotations
+```{r fig.width=8, fig.height=4}
+Idents(pbmc.Tcell) <- "celltype.l2"
+DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
+```
+
+```{r fig.height=5, fig.width=8}
+FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = signature.names, ncol=3, order=T)
+```
+
+## Compare to AddModuleScore from Seurat
+
+Seurat comes with a method for signature enrichment analysis, AddModuleScore. This method is very fast, but the score is highly dependent on the composition of the dataset. 
+Here we will apply AddModuleScore with a simple CD8 T cell signature to two datasets: a set composed of different T cell types (pbmc.Tcell) and a subset of this dataset only comprising the CD8 T cells (pbmc.Tcell.CD8). 
+
+First, generate a subset only comprising CD8 T cells (pbmc.Tcell.CD8)
+```{r fig.width=7, fig.height=4}
+Idents(pbmc.Tcell) <- "celltype.l1"
+pbmc.Tcell.CD8 <- subset(pbmc.Tcell, idents = c("CD8 T"))
+DimPlot(object = pbmc.Tcell.CD8, reduction = "wnn.umap", group.by = "celltype.l2", 
+        label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+Note that applying the same signature to the complete set or to the CD8 T subset gives very different results. When other cell types are present, the score distribution for CD8 T cells has a median close to 1, but the same CD8 T cell evaluated alone give a zero-centered distribution of scores. It may be undesirable to have a score that changes so dramatically for the same cells depending of the composition of the dataset.
+```{r}
+markers.cd8 <- list(Tcell_CD8=c("CD8A","CD8B"))
+
+pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = markers.cd8, name="Tcell_CD8_Seurat")
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_Seurat1")
+
+pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = markers.cd8, name="Tcell_CD8_Seurat")
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_Seurat1")
+
+a | b
+
+summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_Seurat1)
+summary(pbmc.Tcell.CD8$Tcell_CD8_Seurat1)
+```
+
+UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset. Note that the score distribution is nearly identical for the same cell population in different datasets (small differences are due to random resolution of rank ties)
+```{r}
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers.cd8)
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = markers.cd8)
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+a | b
+
+summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_UCell)
+summary(pbmc.Tcell.CD8$Tcell_CD8_UCell)
+```
+
+We can have a look at the distribution of the scores for all T cells:
+```{r fig.width=7, fig.height=4}
+Idents(pbmc.Tcell) <- "celltype.l1"
+DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
+```
+
+```{r}
+FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = c("Tcell_CD8_UCell","Tcell_CD8_Seurat1") , ncol=2, order=T)
+```
+
+...and on the CD8 T cell subset only:
+```{r fig.width=6, fig.height=4}
+Idents(pbmc.Tcell.CD8) <- "celltype.l2"
+DimPlot(object = pbmc.Tcell.CD8, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+```{r fig.width=8, fig.height=4}
+FeaturePlot(pbmc.Tcell.CD8, reduction = "wnn.umap", features = c("Tcell_CD8_UCell","Tcell_CD8_Seurat1") , ncol=2, order=T)
+```
+
+## Further reading
+
+For more examples of UCell functionalities see [THIS DEMO](https://carmonalab.github.io/UCell/UCell_matrix_vignette.html)
+
+The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell)
+
+
+
+
+
+
+
+
+
