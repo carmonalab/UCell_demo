@@ -21,7 +21,7 @@ library(knitr)
 library(rmdformats)
 library(formatR)
 library(renv)
-renv::restore()
+#renv::restore()
 
 ## Global options
 options(max.print="75")

@@ -43,6 +43,7 @@ Calculate on the fly
 ```{r}
 set.seed(123)
 basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R"))
+
 scores <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
 scores[1:5,]
 ```
@@ -50,6 +51,7 @@ scores[1:5,]
 Show distribution of predicted scores
 ```{r}
 library(reshape2)
+library(ggplot2)
 melted <- melt(scores)
 colnames(melted) <- c("Cell","Signature","Uscore")
 p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature), scale = "width") +
@@ -85,14 +87,6 @@ p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature
 p
 ```
 
-Change seed and see effect on signature scores
-```{r}
-set.seed(999)
-scores.3 <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
-
-plot(scores[,1], scores.3[,1])
-plot(scores[,2], scores.3[,2])
-```
 
 Run in parallel with multiple cores
 ```{r}
@@ -110,14 +104,13 @@ p
 
 Define human T cell level 2 signatues
 ```{r, eval=T}
-HCA.markers.Hs.Tcell <- list()
-HCA.markers.Hs.Tcell$Tcell_CD4 <- c("CD4","CD40LG")
-HCA.markers.Hs.Tcell$Tcell_CD8 <- c("CD8A","CD8B")
-HCA.markers.Hs.Tcell$Tcell_Treg <- c("FOXP3","IL2RA")
-HCA.markers.Hs.Tcell$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
-HCA.markers.Hs.Tcell$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
-HCA.markers.Hs.Tcell$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
-saveRDS(HCA.markers.Hs.Tcell,"data/HCA.markers.Hs.Tcell.PBMC.RData")
+signatures.T <- list()
+signatures.T$Tcell_CD4 <- c("CD4","CD40LG")
+signatures.T$Tcell_CD8 <- c("CD8A","CD8B")
+signatures.T$Tcell_Treg <- c("FOXP3","IL2RA")
+signatures.T$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+signatures.T$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+signatures.T$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
 ```
 
 
@@ -131,35 +124,33 @@ DimPlot(object = pbmc.Tcell.CD8, reduction = "wnn.umap", group.by = "celltype.l2
 
 AddModuleScore from Seurat is very fast, but the score is highly dependent on the composition of the dataset
 ```{r}
-HCA.markers.Hs.Tcell <- readRDS("data/HCA.markers.Hs.Tcell.PBMC.RData")
-pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
-VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_test1")
+gene.sets <- list(Tcell_CD8=c("CD8A","CD8B"))
 
-pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), name="Tcell_CD8_test", seed=123)
-VlnPlot(pbmc.Tcell, features = "Tcell_CD8_test1")
+pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = gene.sets, name="Tcell_CD8_Seurat", seed=123)
+p1 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_Seurat1")
 
-summary(pbmc.Tcell.CD8$Tcell_CD8_test1)
-summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_test1)
+pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = gene.sets, name="Tcell_CD8_Seurat", seed=123)
+p2 <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_Seurat1")
+
+p1 | p2
 
 ```
 
 UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset
 ```{r}
-gene.sets <- list(Tcell_CD8=c("CD8A","CD8B"))
 pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = gene.sets)
-VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+p1 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
 
 pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets)
-VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+p2 <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
 
-pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets, ncores=4)
-VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+p1 | p2
 ```
 
 Evaluate more signatures for all flavors of T cells
 ```{r fig.height=3}
-pbmc.Tcell.ss  <- AddModuleScore_UCell(pbmc.Tcell, features = HCA.markers.Hs.Tcell)
-sign.names <- paste0(names(HCA.markers.Hs.Tcell),"_UCell")
+pbmc.Tcell.ss  <- AddModuleScore_UCell(pbmc.Tcell, features = signatures.T)
+sign.names <- paste0(names(signatures.T),"_UCell")
 
 VlnPlot(pbmc.Tcell.ss, features = sign.names)
 VlnPlot(pbmc.Tcell.ss, features = sign.names, group.by = "celltype.l2")
@@ -169,11 +160,10 @@ How do signatures compare to original annotations
 ```{r fig.height=3}
 Idents(pbmc.Tcell.ss) <- "celltype.l2"
 DimPlot(object = pbmc.Tcell.ss, reduction = "wnn.umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
-#DimPlot(object = pbmc.Tcell.ss, reduction = "wnn.umap", split.by = "celltype.l2", label.size = 3, repel = TRUE, ncol=4)
 FeaturePlot(pbmc.Tcell.ss, reduction = "wnn.umap", features = sign.names, ncol=3, order=T)
 ```
 
-Add non-existing genes
+See behavior with missing or non-existing genes
 ```{r}
 pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B","notagene")))
 p1 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
@@ -188,13 +178,16 @@ p1 | p2 | p3
 
 ```
 
+
+Recalculate with the Cd8 T cell simple signature
 ```{r}
-pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = list(Tcell_CD8=c("CD8A","CD8B")))
+gene.sets <- list(Tcell_CD8=c("CD8A","CD8B"))
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = gene.sets)
 VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
 
 
-plot(pbmc.Tcell.CD8$Tcell_CD8_test1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
-plot(pbmc.Tcell$Tcell_CD8_test1, pbmc.Tcell$Tcell_CD8_UCell)
+plot(pbmc.Tcell.CD8$Tcell_CD8_Seurat1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
+plot(pbmc.Tcell$Tcell_CD8_Seurat1, pbmc.Tcell$Tcell_CD8_UCell)
 
 ```
 
@@ -202,28 +195,31 @@ plot(pbmc.Tcell$Tcell_CD8_test1, pbmc.Tcell$Tcell_CD8_UCell)
 Compare to AUCell
 ```{r}
 cells_rankings <- AUCell_buildRankings(pbmc.Tcell@assays$RNA@data,nCores = 1, plotStats = F)
-cells_AUC <- AUCell_calcAUC(HCA.markers.Hs.Tcell, cells_rankings, aucMaxRank=1000)
+cells_AUC <- AUCell_calcAUC(signatures.T, cells_rankings, aucMaxRank=1000)
 cells_AUC.num <- as.data.frame(t(getAUC(cells_AUC)))
-pbmc.Tcell <- AddMetaData(pbmc.Tcell,cells_AUC.num$Tcell_CD8,col.name = "Tcell_CD8_AUCell")
-pbmc.Tcell <- AddMetaData(pbmc.Tcell,cells_AUC.num)
-VlnPlot(pbmc.Tcell, features = "Tcell_CD8_AUCell")
-VlnPlot(pbmc.Tcell, features = "Tcell_CD8")
-```
+colnames(cells_AUC.num) <- paste0(colnames(cells_AUC.num), "_AUCell")
+
+pbmc.Tcell <- AddMetaData(pbmc.Tcell, cells_AUC.num)
 
 
-```{r}
-cells_rankings2 <- AUCell_buildRankings(pbmc.Tcell.CD8@assays$RNA@data,nCores = 1, plotStats = T)
-cells_AUC2 <- AUCell_calcAUC(HCA.markers.Hs.Tcell, cells_rankings2, aucMaxRank=1000)
-cells_AUC.num2 <- as.data.frame(t(getAUC(cells_AUC2)))
-pbmc.Tcell.CD8 <- AddMetaData(pbmc.Tcell.CD8,cells_AUC.num2$Tcell_CD8,col.name = "Tcell_CD8_AUCell")
-VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_AUCell")
+cells_rankings.cd8 <- AUCell_buildRankings(pbmc.Tcell.CD8@assays$RNA@data,nCores = 1, plotStats = T)
+cells_AUC.cd8 <- AUCell_calcAUC(signatures.T, cells_rankings.cd8, aucMaxRank=1000)
+cells_AUC.num.cd8 <- as.data.frame(t(getAUC(cells_AUC.cd8)))
+colnames(cells_AUC.num.cd8) <- paste0(colnames(cells_AUC.num.cd8), "_AUCell")
+
+pbmc.Tcell.CD8 <- AddMetaData(pbmc.Tcell.CD8, cells_AUC.num.cd8)
+
+
+p1 <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_AUCell")
+p2 <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_AUCell")
+p1 | p2
 ```
 
 
 
 ```{r}
 #Seurat ModuleScore vs UCell
-plot(pbmc.Tcell.CD8$Tcell_CD8_test1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
+plot(pbmc.Tcell.CD8$Tcell_CD8_Seurat1, pbmc.Tcell.CD8$Tcell_CD8_UCell)
 
 #AUCell vs UCell
 plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell, pbmc.Tcell.CD8$Tcell_CD8_UCell)
@@ -231,36 +227,66 @@ plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell, pbmc.Tcell.CD8$Tcell_CD8_UCell)
 
 
 
-Test ranks storing functionality
+## Test ranks storing functionality
 
-```{r}
-pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), storeRanks = T)
-VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_UCell")
-
-pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell, features = list(Tcell_CD8=c("CD8A","CD8B")), storeRanks = T, ncores = 8)
+```{r eval=F}
+pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets, storeRanks = T)
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_UCell")
 ```
 
-#Check that scores calculate with rank pre-calculation are the same as those calculated "on the fly"
-```{r}
+Check that scores calculate with rank pre-calculation are the same as those calculated "on the fly"
+```{r eval=F}
 pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = list(Tcell_CD8_copy=c("CD8A","CD8B")))
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_copy_UCell")
 
 plot(pbmc.Tcell.UcellPrecomp$Tcell_CD8_UCell,pbmc.Tcell.UcellPrecomp$Tcell_CD8_copy_UCell)
-```
 
-
-```{r}
-pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = HCA.markers.Hs.Tcell)
-VlnPlot(pbmc.Tcell.UcellPrecomp, features = paste0(names(HCA.markers.Hs.Tcell),"_UCell"))
+pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = signatures.T)
+VlnPlot(pbmc.Tcell.UcellPrecomp, features = paste0(names(signatures.T),"_UCell"))
 
 ```
 
 Gene ranks are stored here:
-```{r}
+```{r eval=F}
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings[,1:10])
 head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10])
 hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",]))
+```
+
+
+# Test escape enrichIT
+http://www.bioconductor.org/packages/release/bioc/vignettes/escape/inst/doc/vignette.html#3_Enrichment
+
+```{r}
+devtools::install_github("ncborcherding/escape")
+
+library(escape)
+#library(dittoSeq)
+#library(SingleCellExperiment)
+#pbmc.sce <- as.SingleCellExperiment(pbmc.Tcell)
+```
+
+```{r}
+library(GSEABase)
+#check format for gene sets
+GS <- getGeneSets(library = "H")
+
+gsets <- list()
+for (sig in names(signatures.T)) {
+   gsets[[sig]] <- GeneSet(signatures.T[[sig]], setName=sig)
+}
+gsc <- GeneSetCollection(gsets)
+
+esc.res <- enrichIt(pbmc.Tcell, gene.sets = gsc, groups = 1000)
+
+```
+
+Very slow, and gives scores in strange multimodal distributions...
+```{r}
+colnames(esc.res) <- paste0(colnames(esc.res), "_enrichIT")
+
+pbmc.Tcell <- AddMetaData(pbmc.Tcell, esc.res)
+VlnPlot(pbmc.Tcell, features = colnames(esc.res))
 ```
 
 Export small subset as sample data for the package
@@ -271,3 +297,40 @@ sample.matrix <- pbmc.ds@assays$RNA@data
 save(sample.matrix, file="sample.matrix.RData")
 ```
 
+
+# Test ties methods
+
+```{r}
+set.seed(123)
+basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R"))
+
+system.time(scores <- ScoreSignatures_UCell(data.matrix,features=basic.sign, ties.method = "random"))
+scores[1:5,]
+
+#Using average for rank ties
+system.time(scores <- ScoreSignatures_UCell(data.matrix,features=basic.sign, ties.method = "average"))
+scores[1:5,]
+
+scores.rand <- list()
+scores.ave <- list()
+for (seed in c(1:3)) {
+   set.seed(seed)
+   t1 <- system.time(scores.rand[[seed]] <- ScoreSignatures_UCell(data.matrix,features=basic.sign, ties.method = "random"))
+   t2 <- system.time(scores.ave[[seed]] <- ScoreSignatures_UCell(data.matrix,features=basic.sign, ties.method = "ave"))
+   print(t1)
+   print(t2)
+}
+
+##Reproducibility
+#Rand vs rand
+plot(scores.rand[[1]][,1], scores.rand[[2]][,1])
+plot(scores.rand[[1]][,1], scores.rand[[3]][,1])
+
+#ave vs ave
+plot(scores.ave[[1]][,1], scores.ave[[2]][,1])
+plot(scores.ave[[1]][,1], scores.ave[[3]][,1])
+
+#Rand vs. ave
+plot(scores.rand[[1]][,1], scores.ave[[1]][,1])
+plot(scores.rand[[2]][,1], scores.ave[[2]][,1])
+```

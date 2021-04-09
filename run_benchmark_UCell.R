@@ -54,7 +54,7 @@ if (method == "UCell") {
     
     out <- tryCatch({
       scores_UCell <- UCell::ScoreSignatures_UCell(this.data, features = ft, chunk.size = chunk.size, force.gc = force.gc)
-      write.table(head(scores_UCell), "aux/UCell.tmp.scores.txt", quote=F)
+  #    write.table(head(scores_UCell), "aux/UCell.tmp.scores.txt", quote=F)
       1
     },
     error=function(cond) {

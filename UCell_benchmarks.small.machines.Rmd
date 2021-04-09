@@ -21,10 +21,10 @@ library(plotly)
 library(SeuratDisk)
 library(Seurat)
 #remotes::install_git("https://gitlab.unil.ch/carmona/UCell.git")
-#remotes::install_git("git@gitlab.unil.ch:carmona/UCell.git")
+remotes::install_github("carmonalab/UCell")
 
 #system("R CMD build ../UCell")
-#system("R CMD INSTALL UCell_0.2.0.tar.gz")
+#system("R CMD INSTALL UCell_0.2.2.tar.gz")
 
 library(UCell)
 library(BiocManager)
@@ -177,15 +177,154 @@ colors <- c("#eba223","#23a5eb")
 ggplot(time_table.df, aes(x=size, y = time, name)) +  geom_point(aes(color = name)) + 
   scale_x_log10() + scale_y_log10() + xlab("Size (# cells)") + ylab("Time (seconds)") + 
   scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+
 ggsave(sprintf("plots/benchmark_time_direct.%iGB.png", max_ram_int), height=4, width=5)
 
 
 ggplot(memory_table.df, aes(x=size, y = memory, name)) +  geom_point(aes(color = name)) + 
   scale_x_log10() + scale_y_log10(limits = c(min_ram_int,max_ram_int)) + xlab("Size (# cells)") + ylab("Memory (GB)") + 
   scale_color_manual(values=colors) + ggtitle(sprintf("Machine with %s RAM", max_ram)) + theme_bw()
+
 ggsave(sprintf("plots/benchmark_mem_direct.%iGB.png", max_ram_int), height=4, width=5)
 
 ```
+
+#Even better, run benchmark externally using Rscript: wrapper_benchmark_UCell.R
+
+Then we load the results here and prepare the plots.
+
+#Machine with 8GB
+```{r}
+res.8GB.UCell <- read.table(file="bench_results/UCell.8Gb.bench.test.txt", header = T)
+res.8GB.AUCell <- read.table(file="bench_results/AUCell.8Gb.bench.test.txt", header = T)
+res<- rbind(res.8GB.UCell, res.8GB.AUCell)
+res$PeakMemory <- res$PeakMemory/1000   #Convert to GB
+
+max_ram_int <- 8
+min_ram_int <- min(res$PeakMemory, na.rm = T)
+colors <- c("#eba223","#23a5eb")
+
+p1 <- ggplot(res, aes(x=Size, y = PeakMemory, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_continuous(trans='log2', limits = c(min_ram_int,max_ram_int), breaks=c(1/4, 1, 4, 8)) +
+  xlab("Size (# cells)") + ylab("Memory (GB)") + scale_color_manual(values=colors) + ggtitle("Machine with 8GB RAM") + 
+  theme_bw() + geom_hline(yintercept=max_ram_int, linetype="dashed", color = "black", size=1)
+
+p2 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_log10(breaks=c(0.3, 1, 3, 10, 30, 100)) + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 8GB RAM") + theme_bw()
+
+
+p1
+p2
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.pdf", max_ram_int), plot=p1, height=3, width=5)
+ggsave(sprintf("plots/benchmark_time.%iGB.pdf", max_ram_int), plot=p2, height=3, width=5)
+
+```
+
+
+#Machine with 16GB
+```{r}
+res.16GB.UCell <- read.table(file="bench_results/UCell.16Gb.bench.test.txt", header = T)
+res.16GB.AUCell <- read.table(file="bench_results/AUCell.16Gb.bench.test.txt", header = T)
+res <- rbind(res.16GB.UCell, res.16GB.AUCell)
+res$PeakMemory <- res$PeakMemory/1000   #Convert to GB
+
+max_ram_int <- 16
+min_ram_int <- min(res$PeakMemory, na.rm = T)
+colors <- c("#eba223","#23a5eb")
+
+p1 <- ggplot(res, aes(x=Size, y = PeakMemory, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_continuous(trans='log2', limits = c(min_ram_int,max_ram_int), breaks=c(1/4, 1, 4, 16)) +
+  xlab("Size (# cells)") + ylab("Memory (GB)") + scale_color_manual(values=colors) + ggtitle("Machine with 16GB RAM") + 
+  theme_bw() + geom_hline(yintercept=max_ram_int, linetype="dashed", color = "black", size=1)
+
+p2 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_log10(breaks=c(0.3, 1, 3, 10, 30, 100)) + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 16GB RAM") + theme_bw()
+
+p1
+p2
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.pdf", max_ram_int), plot=p1, height=3, width=5)
+ggsave(sprintf("plots/benchmark_time.%iGB.pdf", max_ram_int), plot=p2, height=3, width=5)
+
+```
+
+
+#Machine with 64GB
+```{r}
+res.64GB.UCell <- read.table(file="bench_results/UCell.64Gb.bench.test.txt", header = T)
+res.64GB.AUCell <- read.table(file="bench_results/AUCell.64Gb.bench.test.txt", header = T)
+res <- rbind(res.64GB.UCell, res.64GB.AUCell)
+res$PeakMemory <- res$PeakMemory/1000   #Convert to GB
+
+max_ram_int <- 64
+min_ram_int <- min(res$PeakMemory, na.rm = T)
+colors <- c("#eba223","#23a5eb")
+
+p1 <- ggplot(res, aes(x=Size, y = PeakMemory, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_continuous(trans='log2', limits = c(min_ram_int,max_ram_int), breaks=c(1/4, 1, 4, 16, 64)) +
+  xlab("Size (# cells)") + ylab("Peak Memory (GB)") + scale_color_manual(values=colors) + ggtitle("Machine with 64GB RAM") + 
+  theme_bw() + geom_hline(yintercept=max_ram_int, linetype="dashed", color = "black", size=1)
+
+p2 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_log10(breaks=c(0.3, 1, 3, 10, 30, 100)) + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 64GB RAM") + theme_bw()
+
+p1
+p2
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.pdf", max_ram_int), plot=p1, height=3, width=5)
+ggsave(sprintf("plots/benchmark_time.%iGB.pdf", max_ram_int), plot=p2, height=3, width=5)
+
+```
+
+
+#Machine with 128GB
+```{r}
+res.128GB.UCell <- read.table(file="bench_results/UCell.128Gb.bench.test.txt", header = T)
+res.128GB.AUCell <- read.table(file="bench_results/AUCell.128Gb.bench.test.txt", header = T)
+res <- rbind(res.128GB.UCell, res.128GB.AUCell)
+res$PeakMemory <- res$PeakMemory/1000   #Convert to GB
+
+max_ram_int <- 128
+min_ram_int <- min(res$PeakMemory, na.rm = T)
+colors <- c("#eba223","#23a5eb")
+
+p1 <- ggplot(res, aes(x=Size, y = PeakMemory, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_continuous(trans='log2', limits = c(min_ram_int,max_ram_int), breaks=c(1/4, 1, 4, 16, 64)) +
+  xlab("Size (# cells)") + ylab("Peak Memory (GB)") + scale_color_manual(values=colors) + ggtitle("Machine with 128GB RAM") + 
+  theme_bw()
+
+p2 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_log10(breaks=c(0.3, 1, 3, 10, 30, 100, 300, 1000)) + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 128GB RAM") + theme_bw()
+
+p3 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 128GB RAM") + theme_bw()
+
+
+
+p1
+p2
+p3
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.pdf", max_ram_int), plot=p1, height=3, width=5)
+ggsave(sprintf("plots/benchmark_time.%iGB.pdf", max_ram_int), plot=p2, height=3, width=5)
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.png", max_ram_int), plot=p1, height=3, width=5)
+ggsave(sprintf("plots/benchmark_time.%iGB.png", max_ram_int), plot=p2, height=3, width=5)
+
+
+
+```
+
+
+
+
+
 
 
 Benchmark using Rprof (does not account for memory deallocations)
