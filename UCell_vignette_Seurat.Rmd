@@ -40,6 +40,8 @@ opts_knit$set(width=75)
 
 In this demo, we will apply UCell to evaluate gene signatures in single-cell PBMC data. We will use a subset of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1), which comprises multiple immune cell types at different levels of resolution. Because these cells were characterized both in terms of transciptomes (using scRNAseq) and surface proteins (using a panel of antibodies), the cell type annotations should be of very high quality. To demonstrate how UCell can simply and accurately evaluate gene signatures on a query dataset, we will apply it directly to the Seurat object from Hao et al. and compare the signature scores to the original cluster annotations by the authors.
 
+The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_multimodal.h5seurat) is very large (>160K cells), for this illustrative example we used a downsampled version (20,000 cells), and then subset on T cells only.
+
 ## Installation
 
 Install UCell
@@ -53,7 +55,7 @@ set.seed(123)
 
 ## Query single-cell data
 
-Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A](pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds) -- 20,000 T cells  
+Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A](pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds). 
 
 Then load the object and visualize the clustering annotation by the authors.
 ```{r}
