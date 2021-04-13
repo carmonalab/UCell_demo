@@ -20,7 +20,7 @@ library(Seurat)
 remotes::install_github("carmonalab/UCell")
 
 #system("R CMD build ../UCell")
-#system("R CMD INSTALL UCell_0.2.1.tar.gz")
+#system("R CMD INSTALL UCell_1.0.0.tar.gz")
 
 library(UCell)
 library(AUCell)

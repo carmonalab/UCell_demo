@@ -1,0 +1,236 @@
+---
+title: UCell signature enrichment - generate figures for manuscript
+author: "M. Andreatta and S. Carmona"
+date: "06/04/2021"
+output:
+  rmdformats::readthedown:
+    self-contained: true
+    highlight: haddock
+    thumbnails: false
+    css: styles.css
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file, encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_figs4paper.html'))})
+---
+
+```{r setup, echo=FALSE, message=F, warning=F, results=F}
+#install.packages("rmdformats")
+#Template markdown setup
+library(knitr)
+library(rmdformats)
+library(formatR)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               cache.lazy=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               dev='png')
+opts_knit$set(width=75)
+
+```
+
+
+## Prepare environment
+
+Read `renv` environment to install correct package versions
+```{r message=F, warning=F, results=F}
+library(renv)
+renv::restore()
+
+library(Seurat)
+library(UCell)
+library(ggplot2)
+set.seed(123)
+```
+
+## Query single-cell data
+
+The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_multimodal.h5seurat) is very large (>160K cells), for this illustrative example we used a downsampled version (20,000 cells), and then subset on T cells:
+```{r, eval=F}
+set.seed(12345)
+library(SeuratDisk)
+pbmc.azimuth <- LoadH5Seurat("pbmc_multimodal.h5seurat")
+pbmc.azimuth <-  subset(pbmc.azimuth, cells = sample(Cells(pbmc.azimuth), 20000))
+
+Idents(pbmc.azimuth) <- "celltype.l1"
+
+pbmc.azimuth.Tcell <- subset(pbmc.azimuth, idents = c("CD4 T","CD8 T","other T"))
+pbmc.azimuth.Tcell[["RNA"]] <- CreateAssayObject(counts = pbmc.azimuth.Tcell@assays$SCT@counts)
+DefaultAssay(pbmc.azimuth.Tcell) <- "RNA"
+saveRDS(pbmc.azimuth.Tcell,"pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+```
+
+Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A](pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds)
+
+
+Then load the object and visualize the clustering annotation by the authors.
+```{r fig.height=3}
+pbmc.Tcell <- readRDS("pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) +
+    ggtitle("T cell subtypes")
+ggsave("plots/pbmc.umap.Tcells.annotated.pdf", height=5, width=6)
+```
+
+## Score signatures using UCell
+
+Define some signatures for T cell subtypes
+```{r}
+markers <- list()
+markers$Tcell_CD4 <- c("CD4","CD40LG")
+markers$Tcell_CD8 <- c("CD8A","CD8B")
+markers$Tcell_Treg <- c("FOXP3","IL2RA")
+markers$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
+```
+
+Then run AddModuleScore_UCell to calculate signature directly from the Seurat object, and store results in the object metadata.
+```{r fig.height=3}
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers)
+signature.names <- paste0(names(markers),"_UCell")
+
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l1")
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l2")
+```
+
+
+
+How do signatures compare to original annotations
+
+```{r fig.height=4}
+FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = signature.names, ncol=3, order=T, keep.scale="all")
+ggsave("plots/pbmc.umap.Tcells.UCellscores.pdf", height=7, width=11)
+```
+
+## Compare to AddModuleScore from Seurat
+
+Seurat comes with a method for signature enrichment analysis, AddModuleScore. This method is very fast, but the score is highly dependent on the composition of the dataset. 
+Here we will apply AddModuleScore with a simple CD8 T cell signature to two datasets: a set composed of different T cell types (pbmc.Tcell) and a subset of this dataset only comprising the CD8 T cells (pbmc.Tcell.CD8). 
+
+First, generate a subset only comprising CD8 T cells (pbmc.Tcell.CD8)
+```{r}
+Idents(pbmc.Tcell) <- "celltype.l1"
+pbmc.Tcell.CD8 <- subset(pbmc.Tcell, idents = c("CD8 T"))
+DimPlot(object = pbmc.Tcell.CD8, reduction = "wnn.umap", group.by = "celltype.l2", 
+        label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+```
+
+Note that applying the same signature to the complete set or to the CD8 T subset gives very different results. When other cell types are present, the score distribution for CD8 T cells has a median close to 1, but the same CD8 T cell evaluated alone give a zero-centered distribution of scores. It may be undesirable to have a score that changes so dramatically for the same cells depending of the composition of the dataset.
+```{r}
+markers.cd8 <- list(Tcell_CD8=c("CD8A","CD8B"))
+
+pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = markers.cd8, name="Tcell_CD8_Seurat")
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_Seurat1")
+
+pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = markers.cd8, name="Tcell_CD8_Seurat")
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_Seurat1")
+
+a | b
+
+summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_Seurat1)
+summary(pbmc.Tcell.CD8$Tcell_CD8_Seurat1)
+```
+
+UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset. Note that the score distribution is nearly identical for the same cell population in different datasets (small differences are due to random resolution of rank ties)
+```{r}
+pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers.cd8)
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+
+pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = markers.cd8)
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+
+a | b
+
+summary(subset(pbmc.Tcell, subset=celltype.l1=="CD8 T")$Tcell_CD8_UCell)
+summary(pbmc.Tcell.CD8$Tcell_CD8_UCell)
+```
+
+Let's merge everything into a single plot
+```{r}
+library(reshape2)
+s1 <- pbmc.Tcell@meta.data[,c("celltype.l1","Tcell_CD8_UCell","Tcell_CD8_Seurat1")]
+s2 <- pbmc.Tcell.CD8@meta.data[,c("celltype.l1","Tcell_CD8_UCell","Tcell_CD8_Seurat1")]
+
+s1$dataset <- "Tcell_all"
+s2$dataset <- "CD8_Tcell"
+s1$type.set <- paste(s1$celltype.l1, "Tcell_all")
+s2$type.set <- paste(s2$celltype.l1, "CD8_Tcell")
+
+ss <- rbind(s1,s2)
+
+m <- melt(ss)
+colnames(m) <- c("Cell_type","dataset","type.set","Method","Score")
+m$type.set <- factor(x=factor(m$type.set), levels=c("CD4 T Tcell_all","other T Tcell_all","CD8 T Tcell_all","CD8 T CD8_Tcell"))
+m$Cell_type <- factor(x=factor(m$Cell_type), levels=c("CD4 T","other T","CD8 T"))
+
+m1 <- m[m$Method == "Tcell_CD8_UCell",]
+m2 <- m[m$Method == "Tcell_CD8_Seurat1",]
+
+
+p1 <- ggplot(m1, aes(x=type.set, y=Score, col=dataset)) + geom_violin(aes(fill=Cell_type), scale = "width") +
+       geom_boxplot(width=0.1) + theme_bw() + theme(axis.text.x=element_blank()) +
+        scale_fill_manual(values=c("#E69F00","#56B4E9","#d8d8d8")) +
+        scale_color_manual(values=c("#eb4923","#000000"))
+p1
+
+
+p2 <- ggplot(m2, aes(x=type.set, y=Score, col=dataset)) + geom_violin(aes(fill=Cell_type), scale = "width") +
+       geom_boxplot(width=0.1) + theme_bw() + theme(axis.text.x=element_blank()) +
+        scale_fill_manual(values=c("#E69F00","#56B4E9","#d8d8d8")) +
+        scale_color_manual(values=c("#eb4923","#000000"))
+p2
+
+ggsave("plots/pbmc.umap.violin.CD8.Ucell.pdf", plot=p1, height=3, width=5)
+ggsave("plots/pbmc.umap.violin.CD8.AddModuleScore.pdf", plot=p2, height=3, width=5)
+
+
+```
+
+
+# Running time and memory benchmark
+
+Run the benchmark externally using the Rscript `wrapper_benchmark_UCell.R`
+
+Then we load the results here and prepare the plots.
+
+```{r}
+res.128GB.UCell <- read.table(file="bench_results/UCell.128Gb.bench.test.txt", header = T)
+res.128GB.AUCell <- read.table(file="bench_results/AUCell.128Gb.bench.test.txt", header = T)
+res <- rbind(res.128GB.UCell, res.128GB.AUCell)
+res$PeakMemory <- res$PeakMemory/1000   #Convert to GB
+
+max_ram_int <- 128
+min_ram_int <- min(res$PeakMemory, na.rm = T)
+colors <- c("#eba223","#23a5eb")
+
+p1 <- ggplot(res, aes(x=Size, y = PeakMemory, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_continuous(trans='log2', limits = c(min_ram_int,max_ram_int), breaks=c(1/4, 1, 4, 16, 64)) +
+  xlab("Size (# cells)") + ylab("Peak Memory (GB)") + scale_color_manual(values=colors) + ggtitle("Machine with 128GB RAM") + 
+  theme_bw()
+
+p2 <- ggplot(res, aes(x=Size, y = Time, Method)) +  geom_point(aes(color = Method)) + 
+  scale_x_log10() + scale_y_log10(breaks=c(0.3, 1, 3, 10, 30, 100, 300, 1000)) + xlab("Size (# cells)") + ylab("Time (seconds)") + 
+  scale_color_manual(values=colors) + ggtitle("Machine with 128GB RAM") + theme_bw()
+
+
+p1
+p2
+
+ggsave(sprintf("plots/benchmark_memory.%iGB.pdf", max_ram_int), plot=p1, height=3, width=4)
+ggsave(sprintf("plots/benchmark_time.%iGB.pdf", max_ram_int), plot=p2, height=3, width=4)
+```
+
+
+
+
+
+
+
+
+
