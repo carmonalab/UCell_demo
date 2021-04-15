@@ -1,0 +1,148 @@
+---
+title: UCell with signatures from mSigDB
+author: 
+- Massimo Andreatta^[massimo.andreatta@unil.ch]
+- Santiago Carmona^[santiago.carmona@unil.ch]
+date: "15/02/2021"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+#output: html_notebook
+---
+
+
+```{r message=F, warning=F}
+#renv::restore()
+library(Seurat)
+#Development moved to GitHub
+remotes::install_github("carmonalab/UCell")
+
+library(UCell)
+```
+
+The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_multimodal.h5seurat) is very large (>160K cells), for this illustrative example we used a downsampled version (20,000 cells)
+```{r, eval=T}
+set.seed(12345)
+library(SeuratDisk)
+pbmc.azimuth <- LoadH5Seurat("pbmc_multimodal.h5seurat")
+pbmc.azimuth <-  subset(pbmc.azimuth, cells = sample(Cells(pbmc.azimuth), 20000))
+
+Idents(pbmc.azimuth) <- "celltype.l1"
+
+saveRDS(pbmc.azimuth,"pbmc_multimodal.downsampled20k.seurat.RNA.rds")
+```
+
+Have a look at the atlas in UMAP space
+```{r}
+library(ggplot2)
+DimPlot(object = pbmc.azimuth, reduction = "wnn.umap", group.by = "celltype.l1", label = TRUE, label.size = 3, repel = TRUE) +
+    ggtitle("Level 1 annotations")
+DimPlot(object = pbmc.azimuth, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) +
+    ggtitle("Level 2 annotations") + NoLegend()
+
+```
+
+
+## Score signatures using UCell
+
+Get some signatures from MSigDB
+```{r}
+#install.packages("msigdbr")
+library(msigdbr)
+h_gene_sets = as.data.frame(msigdbr(species = "Homo sapiens", category = "H"))
+
+names <- unique(h_gene_sets$gs_name)
+h.markers <- list()
+
+for (h in names) {
+   sub <- h_gene_sets[h_gene_sets$gs_name==h,"gene_symbol"]
+   h.markers[[h]] <- unique(sub)
+}
+
+length(h.markers)
+head(h.markers)
+```
+
+Then run AddModuleScore_UCell to calculate signature directly from the Seurat object, and store results in the object metadata.
+```{r}
+pbmc.azimuth <- AddModuleScore_UCell(pbmc.azimuth, features = h.markers, ncores=8)
+signature.names <- paste0(names(h.markers),"_UCell")
+```
+
+```{r fig.height=5}
+VlnPlot(pbmc.azimuth, features = signature.names[1:9], group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names[10:18], group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names[19:27], group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names[28:36], group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names[37:45], group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names[45:50], group.by = "celltype.l1", pt.size = 0)
+```
+
+#Read in signatures from Human Cell atlas [ref]
+```{r}
+tab <- read.csv(file="aux/HCL1_selected_signatures.csv", header=T)
+head(tab)
+
+names <- colnames(tab)
+cd45.markers <- list()
+
+for (h in names) {
+   cd45.markers[[h]] <- unique(tab[,h])
+}
+
+head(cd45.markers$B.cell)
+
+```
+
+Then run AddModuleScore_UCell to calculate signature directly from the Seurat object, and store results in the object metadata.
+```{r}
+pbmc.azimuth <- AddModuleScore_UCell(pbmc.azimuth, features = cd45.markers, ncores=8)
+signature.names <- paste0(names(cd45.markers),"_UCell")
+```
+
+```{r fig.height=4}
+VlnPlot(pbmc.azimuth, features = signature.names, group.by = "celltype.l1", pt.size = 0)
+VlnPlot(pbmc.azimuth, features = signature.names, group.by = "celltype.l2", pt.size = 0)
+```
+
+See in UMAP space
+```{r fig.height=3}
+FeaturePlot(pbmc.azimuth, reduction = "wnn.umap", features = signature.names, ncol=3, order=T, keep.scale="all")
+```
+
+What is the influence of signature length? down-size signatures to observe effect
+```{r}
+set.seed(123)
+length(cd45.markers$B.cell)
+cd45.markers$B.cell.100 <- sample(cd45.markers$B.cell, size = 100)
+cd45.markers$B.cell.50 <- sample(cd45.markers$B.cell, size = 50)
+cd45.markers$B.cell.20 <- sample(cd45.markers$B.cell, size = 20)
+cd45.markers$B.cell.10 <- sample(cd45.markers$B.cell, size = 10)
+set.seed(1234)
+cd45.markers$B.cell.100.2 <- sample(cd45.markers$B.cell, size = 100)
+cd45.markers$B.cell.50.2 <- sample(cd45.markers$B.cell, size = 50)
+cd45.markers$B.cell.20.2 <- sample(cd45.markers$B.cell, size = 20)
+cd45.markers$B.cell.10.2 <- sample(cd45.markers$B.cell, size = 10)
+set.seed(12345)
+cd45.markers$B.cell.100.3 <- sample(cd45.markers$B.cell, size = 100)
+cd45.markers$B.cell.50.3 <- sample(cd45.markers$B.cell, size = 50)
+cd45.markers$B.cell.20.3 <- sample(cd45.markers$B.cell, size = 20)
+cd45.markers$B.cell.10.3 <- sample(cd45.markers$B.cell, size = 10)
+```
+
+```{r fig.height=6}
+pbmc.azimuth <- AddModuleScore_UCell(pbmc.azimuth, features = cd45.markers, ncores=8)
+signature.names <- paste0(names(cd45.markers),"_UCell")
+
+VlnPlot(pbmc.azimuth, features = signature.names, group.by = "celltype.l1", pt.size = 0)
+```
+
+```{r fig.height=4}
+b.cells <- subset(pbmc.azimuth, subset=celltype.l1=="B")
+VlnPlot(b.cells, features = signature.names, group.by = "celltype.l1", pt.size = 0, same.y.lims = T, ncol=6)
+
+```
+
+
