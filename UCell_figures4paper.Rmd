@@ -67,7 +67,7 @@ DefaultAssay(pbmc.azimuth.Tcell) <- "RNA"
 saveRDS(pbmc.azimuth.Tcell,"pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
 ```
 
-Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A](pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds)
+Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds](https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A)
 
 
 Then load the object and visualize the clustering annotation by the authors.
