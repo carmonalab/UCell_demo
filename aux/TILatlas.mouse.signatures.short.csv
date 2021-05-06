@@ -1,0 +1,11 @@
+Tfh,CD8_NaiveLike,CD8_EffectorMemory,Thelper,CD4_NaiveLike,CD8_Tpex,CD8_Tex,Treg
+Cd4,Cd8a,Cd8a,Cd4,Cd4,Cd8a,Cd8a,Cd4
+Cd40lg,Cd8b1,Cd8b1,Cd40lg,Cd40lg,Cd8b1,Cd8b1,Il2ra
+Tox2,Ccr7,Gzma,Il7r,Ccr7,Lag3,Lag3,Foxp3
+Maf,Il7r,Gzmk,Rora,Il7r,Xcl1,Havcr2,
+Cd200,Sell,Ccl5,Anxa1,Sell,Crtam,Gzmb,
+Batf,Tcf7,Cxcr3,,Tcf7,Tox,Prf1,
+,S1pr1,,,Lef1,Zeb2,Pdcd1,
+,Lef1,,,,Pdcd1,Tigit,
+,,,,,Tcf7,,
+,,,,,Ccr7,,
