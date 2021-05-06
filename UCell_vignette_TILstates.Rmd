@@ -21,7 +21,7 @@ library(knitr)
 library(rmdformats)
 library(formatR)
 library(renv)
-#renv::restore()
+renv::restore()
 
 ## Global options
 options(max.print="75")
@@ -45,24 +45,25 @@ remotes::install_github("carmonalab/UCell")
 
 library(Seurat)
 library(UCell)
+library(dplyr)
 set.seed(123)
 ```
 
-Use data from Yost et al.
+Use data from Yost et al. Nat Med 2019 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6689255/
+Pre-compiled R object available at https://drive.switch.ch/index.php/s/cluBLHkFFzLZWzL
 ```{r fig.height=2.5}
-#yost.seurat <- readRDS("../ProjecTILs.explore.R4/aux/Yost.pretreatment.all.rds")
-yost.seurat <- readRDS("../ProjecTILs.explore.R4/input/Yost/Yost_alldata_seurat.rds")
-Idents(yost.seurat) <- "treatment"
-yost.seurat <- subset(yost.seurat, idents="pre")
-yost.seurat$Source <- "Yost"
-
-yost.seurat <- NormalizeData(yost.seurat, verbose = FALSE)
-yost.seurat <- FindVariableFeatures(yost.seurat, selection.method = "vst", nfeatures = 1000, verbose = FALSE)
-yost.seurat <- ScaleData(yost.seurat, verbose=FALSE)
-yost.seurat <- RunPCA(yost.seurat, features = yost.seurat@assays$RNA@var.features, verbose = FALSE)
-yost.seurat <- RunUMAP(yost.seurat, dims=1:30)
-yost.seurat
+download.file("https://drive.switch.ch/index.php/s/cluBLHkFFzLZWzL","Yost.pretreatment.all.rds")
+data.seurat <- readRDS("Yost.pretreatment.all.rds")
+data.seurat <- data.seurat %>% NormalizeData %>% FindVariableFeatures %>% ScaleData %>% RunPCA %>% RunUMAP(dims=1:30)
+data.seurat
 ```
+Colour by patient and original cluster annotations
+```{r}
+DimPlot(data.seurat, group.by = "patient")
+DimPlot(data.seurat, group.by = "cluster")
+DimPlot(data.seurat, group.by = "cluster.T")
+```
+
 
 Unsupervised clustering
 ```{r}
@@ -72,35 +73,22 @@ which.red <- "pca"
 resol=0.7
 ndim=30
 
-yost.seurat <- FindNeighbors(yost.seurat, reduction = which.red, dims = 1:ndim)
-yost.seurat <- FindClusters(yost.seurat, resolution = resol)
+data.seurat <- FindNeighbors(data.seurat, reduction = which.red, dims = 1:ndim)
+data.seurat <- FindClusters(data.seurat, resolution = resol)
 
-DimPlot(yost.seurat, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
-
+DimPlot(data.seurat, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
 ```
 
-```{r}
-DimPlot(yost.seurat, group.by = "patient")
-DimPlot(yost.seurat, group.by = "cluster")
-DimPlot(yost.seurat, group.by = "cluster.T")
+Apply UCell with human cell type signatures to identify major cell types
 
-FeaturePlot(yost.seurat, features=c("CD3E","CD8A","CD4","FOXP3"))
-```
-
-Apply UCell with cell with cell type signatures to identify major cell types
+These signatures were extracted from https://www.nature.com/articles/s41586-020-2157-4 and further filtered
 ```{r fig.height=3}
-signatures <- read.csv("aux/HCA_Markers_filtered_curated_scripted.csv", row.names = 1)
 
-signatures <- t(signatures)
-head(signatures)
+signaturesHumanCellTypes <- readRDS("aux/signaturesHumanCellTypes.rds")
 
-sign <- list()
-for (celltype in rownames(signatures)) {
-   geneset <- signatures[celltype,]
-   sign[[celltype]] <- geneset[geneset!=""]
-}
+head(signaturesHumanCellTypes)
 
-yost.seurat <- AddModuleScore_UCell(yost.seurat, features=sign, ncores=4)
+data.seurat <- AddModuleScore_UCell(data.seurat, features=signaturesHumanCellTypes, ncores=4)
 
 #Some major cell types to look at:
 toplot <- c("Macrophage","Fibroblast","T.cell",
@@ -108,81 +96,62 @@ toplot <- c("Macrophage","Fibroblast","T.cell",
             "Endothelial.cell.1","NK","Platelet")
 
 featnames <- paste0(toplot,"_UCell")
-FeaturePlot(yost.seurat, features = featnames, pt.size=0.1, max.cutoff = 'q99')
+FeaturePlot(data.seurat, features = featnames, pt.size=0.1, max.cutoff = 'q99')
+VlnPlot(data.seurat, features = featnames, pt.size = 0, split.by = "seurat_clusters")
 ```
 
 Identify T cell clusters by UCell score
 ```{r fig.height=3}
-VlnPlot(yost.seurat, features = featnames, pt.size = 0, split.by = "seurat_clusters")
-
 # select as Tcell clusters only those with median Uscore>0.2
-medians <- sapply(levels(yost.seurat$seurat_clusters), function(x){
-   median(yost.seurat@meta.data[yost.seurat$seurat_clusters==x, "T.cell_UCell"])
+medians <- sapply(levels(data.seurat$seurat_clusters), function(x){
+   median(data.seurat@meta.data[data.seurat$seurat_clusters==x, "T.cell_UCell"])
 })
 tcell.clusters <- names(medians[medians>0.2])
 
 #Add metadata
-yost.seurat$is.Tcell <- FALSE
-yost.seurat@meta.data[yost.seurat$seurat_clusters %in% tcell.clusters, "is.Tcell"] <- TRUE
-DimPlot(yost.seurat, group.by = "is.Tcell")
+data.seurat$is.Tcell <- FALSE
+data.seurat@meta.data[data.seurat$seurat_clusters %in% tcell.clusters, "is.Tcell"] <- TRUE
+DimPlot(data.seurat, group.by = "is.Tcell")
 ```
 
 Subset on T cells
 ```{r}
-yost.tcells <- subset(yost.seurat, subset=is.Tcell==TRUE)
-yost.tcells
+data.seurat.tcells <- subset(data.seurat, subset=is.Tcell==TRUE)
+data.seurat.tcells
 ```
 
 Recalculate embeddings and clustering
 ```{r}
-set.seed(123)
-which.red <- "pca"
-resol=0.4
 ndim=20
+data.seurat.tcells <- data.seurat.tcells %>% NormalizeData %>% FindVariableFeatures %>% ScaleData %>% RunPCA  %>% RunUMAP(dims=1:ndim)
 
-yost.tcells <- NormalizeData(yost.tcells, verbose = FALSE)
-yost.tcells <- FindVariableFeatures(yost.tcells, selection.method = "vst", nfeatures = 1000, verbose = FALSE)
-yost.tcells <- ScaleData(yost.tcells, verbose=FALSE)
-yost.tcells <- RunPCA(yost.tcells, features = yost.tcells@assays$RNA@var.features, verbose = FALSE)
-yost.tcells <- RunUMAP(yost.tcells, dims=1:ndim)
+data.seurat.tcells <- FindNeighbors(data.seurat.tcells, reduction = which.red, dims = 1:ndim)
+data.seurat.tcells <- FindClusters(data.seurat.tcells, resolution = resol)
 
-
-yost.tcells <- FindNeighbors(yost.tcells, reduction = which.red, dims = 1:ndim)
-yost.tcells <- FindClusters(yost.tcells, resolution = resol)
-
-DimPlot(yost.tcells, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
-
+DimPlot(data.seurat.tcells, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
 ```
 
 By patient and by annotation from original study
 ```{r}
-DimPlot(yost.tcells, group.by = "patient")
-DimPlot(yost.tcells, group.by = "cluster.T")
+DimPlot(data.seurat.tcells, group.by = "patient")
+DimPlot(data.seurat.tcells, group.by = "cluster.T")
 
 ```
 
 
 Apply UCell using T cell signatures from multi-study reference atlas
 ```{r fig.height=3}
-#Signatures from TIL atlas
-TIL.signatures <- read.csv("aux/TILatlas.human.signatures.csv")
-TIL.signatures
+#Signatures from TIL atlas, Andreatta et al  https://doi.org/10.1101/2020.06.23.166546
 
-sign.TIL <- list()
-for (celltype in colnames(TIL.signatures)) {
-   geneset <- TIL.signatures[,celltype]
-   sign.TIL[[celltype]] <- geneset[geneset!=""]
-}
-#Also include NK signatures (NKT cells?)
-sign.TIL[["NK"]] <- sign[["NK"]]
-sign.TIL[["cycling"]] <- c("TOP2A","MKI67","STMN1")
+signaturesHumanTILs <- readRDS("aux/signaturesHumanTILs.rds")
+signaturesHumanTILs[["cycling"]] <- c("TOP2A","MKI67","STMN1")
 
-yost.tcells <- AddModuleScore_UCell(yost.tcells, features=sign.TIL, ncores=4)
+data.seurat.tcells <- AddModuleScore_UCell(data.seurat.tcells, features=signaturesHumanTILs, ncores=4)
 ```
 
 ```{r fig.height=4}
 featnames <- paste0(names(sign.TIL),"_UCell")
-FeaturePlot(yost.tcells, features = featnames, pt.size=0.1)
-VlnPlot(yost.tcells, features = featnames, pt.size = 0, split.by = "seurat_clusters")
+FeaturePlot(data.seurat.tcells, features = featnames, pt.size=0.1)
+VlnPlot(data.seurat.tcells, features = featnames, pt.size = 0, split.by = "seurat_clusters")
 ```
 
