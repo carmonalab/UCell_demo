@@ -11,7 +11,7 @@ output:
 knit: (function(input_file, encoding) {
   out_dir <- 'docs';
   rmarkdown::render(input_file, encoding=encoding,
-  output_file=file.path(dirname(input_file), out_dir, 'UCell_Seurat_vignette.html'))})
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_vignette_TILstates.html'))})
 ---
 
 
@@ -68,6 +68,7 @@ data.seurat
 ```
 
 Colour by patient and original cluster annotations
+
 ```{r}
 DimPlot(data.seurat, group.by = "patient")
 DimPlot(data.seurat, group.by = "cluster")
@@ -88,11 +89,13 @@ data.seurat <- FindClusters(data.seurat, resolution = resol)
 
 DimPlot(data.seurat, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
 ```
+
 ## Score general cell type signatures using UCell
 
 Apply UCell with human cell type signatures to identify major cell types
 These signatures were extracted from [Han et al Nature 2020](https://www.nature.com/articles/s41586-020-2157-4) and further filtered
-```{r}
+
+```{r, fig.height=12, fig.width=7}
 
 signaturesHumanCellTypes <- readRDS("aux/signaturesHumanCellTypes.rds")
 
@@ -103,12 +106,13 @@ data.seurat <- AddModuleScore_UCell(data.seurat, features=signaturesHumanCellTyp
 #Some major cell types to look at:
 toplot <- c("Macrophage","Fibroblast","T.cell",
             "Stromal.cell","B.cell","Myeloid.cell",
-            "Endothelial.cell.1","NK","Platelet")
+            "Endothelial.cell.1","NK")
 
 featnames <- paste0(toplot,"_UCell")
-FeaturePlot(data.seurat, features = featnames, pt.size=0.1, max.cutoff = 'q99')
-VlnPlot(data.seurat, features = featnames, pt.size = 0, split.by = "seurat_clusters")
+FeaturePlot(data.seurat, features = featnames, pt.size=0.1, max.cutoff = 'q99', ncol=2)
+VlnPlot(data.seurat, features = featnames, pt.size = 0, split.by = "seurat_clusters", ncol=2)
 ```
+
 We can appreciate that some clusters have a clearly high mean distribution of T cell signature scores (T.cell_UCell score > 0.2).
 We can use this value as a rudimentary threshold to split T cell from non-T cell clusters.
 
@@ -116,6 +120,7 @@ We can use this value as a rudimentary threshold to split T cell from non-T cell
 ## Identify T cells based on signatures and subset them
 
 Identify T cell clusters by UCell score
+
 ```{r}
 # select as Tcell clusters only those with median Uscore>0.2
 medians <- sapply(levels(data.seurat$seurat_clusters), function(x){
@@ -130,12 +135,14 @@ DimPlot(data.seurat, group.by = "is.Tcell")
 ```
 
 Subset on T cells
+
 ```{r}
 data.seurat.tcells <- subset(data.seurat, subset=is.Tcell==TRUE)
 data.seurat.tcells
 ```
 
 Recalculate embeddings only for filtered T cells
+
 ```{r}
 ndim=20
 resol=3
@@ -143,11 +150,13 @@ data.seurat.tcells <- data.seurat.tcells %>% NormalizeData %>% FindVariableFeatu
 ```
 
 By patient and by annotation from original study
+
 ```{r}
 DimPlot(data.seurat.tcells, group.by = "patient")
 DimPlot(data.seurat.tcells, group.by = "cluster.T")
 DimPlot(data.seurat.tcells, group.by = "seurat_clusters")
 ```
+
 ## Score TIL subtype-specific signatures using UCell
 
 Now we can apply UCell using signatures specific for distict T cell subtypes.
@@ -183,6 +192,8 @@ rownames(TILsigScores_vs_OriginalCluster.m) <- TILsigScores_vs_OriginalCluster[,
 heatmap(t(TILsigScores_vs_OriginalCluster.m),cexCol=0.7,scale="none")
 ```
 
+
+For more in-depth analysis of T cell states we recommend projecting your data onto T cell reference atlases using [ProjecTILs](https://github.com/carmonalab/ProjecTILs)
 
 ## Further reading
 
