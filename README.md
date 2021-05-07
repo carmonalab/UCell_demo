@@ -2,10 +2,11 @@
 
 In this repo we host code and scripts to run [UCell](https://github.com/carmonalab/UCell) in different settings.
 
-* `UCell_vignette_Seurat.Rmd` and `UCell_vignette_matrix.Rmd` can be used to reproduce the vignettes (in .html) hosted on github.io:
+* `UCell_vignette_Seurat.Rmd`, `UCell_vignette_matrix.Rmd` and `UCell_vignette_TILstates.Rmd` can be used to reproduce the vignettes (in .html) hosted on github.io:
 
    + [Signature enrichment analysis with UCell](https://carmonalab.github.io/UCell/UCell_matrix_vignette.html)
    + [Using UCell with Seurat objects](https://carmonalab.github.io/UCell/UCell_Seurat_vignette.html)
+   + [Using UCell and Seurat to identify different T cell subtypes/states in human tumors](https://carmonalab.github.io/UCell/UCell_vignette_TILstates.html)
 
 * `UCell_figures4paper.Rmd` contains the code to the reproduce the figures of the [accompanying manuscript](https://doi.org/10.1101/2021.04.13.439670)
 
