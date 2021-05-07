@@ -105,7 +105,7 @@ How do signatures compare to original annotations
 
 ```{r fig.height=4}
 FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = signature.names, ncol=3, order=T, keep.scale="all")
-ggsave("plots/pbmc.umap.Tcells.UCellscores.pdf", height=7, width=11)
+ggsave("plots/pbmc.umap.Tcells.UCellscores.pdf", height=6, width=11.5)
 ```
 
 ## Compare to AddModuleScore from Seurat

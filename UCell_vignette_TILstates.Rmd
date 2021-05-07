@@ -1,0 +1,191 @@
+---
+title: Evaluating human TIL subtype signatures using UCell
+author: "M. Andreatta and S. Carmona"
+date: "30/04/2021"
+output:
+  rmdformats::readthedown:
+    self-contained: true
+    highlight: haddock
+    thumbnails: false
+    css: styles.css
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file, encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_Seurat_vignette.html'))})
+---
+
+
+
+In this vignette we show how to use [UCell](https://github.com/carmonalab/UCell) gene signature scoring to identify and filter tumor-infiltrating T cell subtypes
+
+
+```{r setup, echo=FALSE, message=F, warning=F, results=F}
+#install.packages("rmdformats")
+#Template markdown setup
+library(knitr)
+library(rmdformats)
+library(formatR)
+
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               cache.lazy=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               dev='png')
+opts_knit$set(width=75)
+
+```
+
+## Prepare environment
+
+```{r message=F, warning=F, results=F}
+library(renv)
+renv::restore()
+#remotes::install_github("carmonalab/UCell")
+
+library(Seurat)
+library(UCell)
+library(dplyr)
+set.seed(123)
+```
+
+## Query single-cell data
+
+Use data from [Yost et al. Nat Med 2019](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6689255/)
+Pre-compiled R object available [here](https://drive.switch.ch/index.php/s/cluBLHkFFzLZWzL/download)
+```{r fig.height=2.5}
+inputFile <- "Yost.pretreatment.all.rds"
+if(!file.exists(inputFile)) { download.file("https://drive.switch.ch/index.php/s/cluBLHkFFzLZWzL/download",inputFile)}
+data.seurat <- readRDS(inputFile)
+data.seurat <- data.seurat %>% NormalizeData %>% FindVariableFeatures %>% ScaleData %>% RunPCA %>% RunUMAP(dims=1:30)
+data.seurat
+```
+
+Colour by patient and original cluster annotations
+```{r}
+DimPlot(data.seurat, group.by = "patient")
+DimPlot(data.seurat, group.by = "cluster")
+DimPlot(data.seurat, group.by = "cluster.T")
+```
+
+## Unsupervised clustering
+
+```{r}
+set.seed(123)
+
+which.red <- "pca"
+resol=0.7
+ndim=30
+
+data.seurat <- FindNeighbors(data.seurat, reduction = which.red, dims = 1:ndim)
+data.seurat <- FindClusters(data.seurat, resolution = resol)
+
+DimPlot(data.seurat, reduction="umap", group.by = "seurat_clusters", label = T) + NoLegend()
+```
+## Score general cell type signatures using UCell
+
+Apply UCell with human cell type signatures to identify major cell types
+These signatures were extracted from [Han et al Nature 2020](https://www.nature.com/articles/s41586-020-2157-4) and further filtered
+```{r}
+
+signaturesHumanCellTypes <- readRDS("aux/signaturesHumanCellTypes.rds")
+
+head(signaturesHumanCellTypes)
+
+data.seurat <- AddModuleScore_UCell(data.seurat, features=signaturesHumanCellTypes, ncores=4)
+
+#Some major cell types to look at:
+toplot <- c("Macrophage","Fibroblast","T.cell",
+            "Stromal.cell","B.cell","Myeloid.cell",
+            "Endothelial.cell.1","NK","Platelet")
+
+featnames <- paste0(toplot,"_UCell")
+FeaturePlot(data.seurat, features = featnames, pt.size=0.1, max.cutoff = 'q99')
+VlnPlot(data.seurat, features = featnames, pt.size = 0, split.by = "seurat_clusters")
+```
+We can appreciate that some clusters have a clearly high mean distribution of T cell signature scores (T.cell_UCell score > 0.2).
+We can use this value as a rudimentary threshold to split T cell from non-T cell clusters.
+
+
+## Identify T cells based on signatures and subset them
+
+Identify T cell clusters by UCell score
+```{r}
+# select as Tcell clusters only those with median Uscore>0.2
+medians <- sapply(levels(data.seurat$seurat_clusters), function(x){
+   median(data.seurat@meta.data[data.seurat$seurat_clusters==x, "T.cell_UCell"])
+})
+tcell.clusters <- names(medians[medians>0.2])
+
+#Add metadata
+data.seurat$is.Tcell <- FALSE
+data.seurat@meta.data[data.seurat$seurat_clusters %in% tcell.clusters, "is.Tcell"] <- TRUE
+DimPlot(data.seurat, group.by = "is.Tcell")
+```
+
+Subset on T cells
+```{r}
+data.seurat.tcells <- subset(data.seurat, subset=is.Tcell==TRUE)
+data.seurat.tcells
+```
+
+Recalculate embeddings only for filtered T cells
+```{r}
+ndim=20
+resol=3
+data.seurat.tcells <- data.seurat.tcells %>% NormalizeData %>% FindVariableFeatures %>% ScaleData %>% RunPCA  %>% RunUMAP(dims=1:ndim)
+```
+
+By patient and by annotation from original study
+```{r}
+DimPlot(data.seurat.tcells, group.by = "patient")
+DimPlot(data.seurat.tcells, group.by = "cluster.T")
+DimPlot(data.seurat.tcells, group.by = "seurat_clusters")
+```
+## Score TIL subtype-specific signatures using UCell
+
+Now we can apply UCell using signatures specific for distict T cell subtypes.
+TIL states signatures were obtained from ProjecTILs' reference TIL atlas (https://github.com/carmonalab/ProjecTILs), Andreatta et al Nature Communications (2021)
+
+```{r}
+signaturesHumanTILs <- readRDS("aux/signaturesHumanTILs.rds")
+signaturesHumanTILs
+signaturesHumanTILs[["cycling"]] <- c("TOP2A","MKI67","STMN1")
+
+data.seurat.tcells <- AddModuleScore_UCell(data.seurat.tcells, features=signaturesHumanTILs, ncores=4)
+```
+
+```{r}
+featnames <- paste0(names(signaturesHumanTILs),"_UCell")
+FeaturePlot(data.seurat.tcells, features = featnames, pt.size=0.1,order = T)
+VlnPlot(data.seurat.tcells, features = featnames, pt.size = 0, split.by = "seurat_clusters")
+```
+
+
+## Compare TIL subtype signature scores against original annotation
+
+Now we can assess gene signature scores (their average values) in each T cell cluster as defined by Yost et al. 
+An overall agreement between T cell subtypes defined by Yost and the corresponding gene signature scores can be observed.For example, CD8_eff and CD8_mem both with high CD8_EffectorMemory score, CD8_ex_act and CD_ex with highest CD8_Tex score, Treg with highest Treg score and Th17 with highest Thelper score. Instead, other Yost clusters seem to be more heterogeneous/ambiguously defined, e.g. CD8_act with both high CD8_EffectorMemory and CD4 Thelper scores, and Naive cluster with high Thelper signal.
+
+
+```{r}
+library(dplyr)
+TILsigScores <- data.seurat.tcells@meta.data[,featnames]
+TILsigScores_vs_OriginalCluster <- TILsigScores %>% filter(!is.na(data.seurat.tcells@meta.data$cluster.T)) %>% group_by(data.seurat.tcells@meta.data$cluster.T[!is.na(data.seurat.tcells@meta.data$cluster.T)]) %>% summarise_each(mean)
+TILsigScores_vs_OriginalCluster.m <- as.matrix(TILsigScores_vs_OriginalCluster[,-1])
+rownames(TILsigScores_vs_OriginalCluster.m) <- TILsigScores_vs_OriginalCluster[,1][[1]]
+heatmap(t(TILsigScores_vs_OriginalCluster.m),cexCol=0.7,scale="none")
+```
+
+
+## Further reading
+
+For more examples of UCell functionalities and reproducible R Notebook see [UCell Demos](https://gitlab.unil.ch/carmona/UCell_demo/)
+
+The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell)
