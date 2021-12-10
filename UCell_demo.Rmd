@@ -17,10 +17,11 @@ knit: (function(input_file, encoding) {
 #renv::restore()
 library(Seurat)
 #Development moved to GitHub
-remotes::install_github("carmonalab/UCell")
+#remotes::install_github("carmonalab/UCell")
+remotes::install_github("carmonalab/UCell", ref="dev")  #development version
 
-#system("R CMD build ../UCell")
-#system("R CMD INSTALL UCell_1.0.0.tar.gz")
+#system("R CMD build /Users/mass/Documents/Projects/Github/UCell")
+#system("R CMD INSTALL UCell_1.1.0.tar.gz")
 
 library(UCell)
 library(AUCell)
@@ -42,7 +43,9 @@ data.matrix[1:5,1:5]
 Calculate on the fly
 ```{r}
 set.seed(123)
-basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R"))
+#basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R"))
+basic.sign <- list( Tcell_signature = c("CD2","CD3E","CD3D"), Myeloid_signature = c("SPI1","FCER1G","CSF1R","LCK-"))
+
 
 scores <- ScoreSignatures_UCell(data.matrix,features=basic.sign)
 scores[1:5,]
@@ -109,8 +112,8 @@ signatures.T$Tcell_CD4 <- c("CD4","CD40LG")
 signatures.T$Tcell_CD8 <- c("CD8A","CD8B")
 signatures.T$Tcell_Treg <- c("FOXP3","IL2RA")
 signatures.T$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
-signatures.T$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
-signatures.T$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+signatures.T$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
+signatures.T$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
 ```
 
 

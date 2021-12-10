@@ -71,8 +71,8 @@ markers$Tcell_CD4 <- c("CD4","CD40LG")
 markers$Tcell_CD8 <- c("CD8A","CD8B")
 markers$Tcell_Treg <- c("FOXP3","IL2RA")
 markers$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
-markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1")
-markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC")
+markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
+markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
 ```
 
 ```{r fig.height=6, fig.width=10}

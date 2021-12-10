@@ -317,15 +317,15 @@
     },
     "UCell": {
       "Package": "UCell",
-      "Version": "1.0.0",
+      "Version": "1.1.1",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "UCell",
       "RemoteUsername": "carmonalab",
       "RemoteRef": "HEAD",
-      "RemoteSha": "3a9820566a32f6a64314ccbe119dc6f202c5959d",
-      "Hash": "d29687f51dc9c4a39e78c8454925b2ba"
+      "RemoteSha": "968c78049a9258207c53a7a9cfae18561a1e046c",
+      "Hash": "196c1d52781f1a6ef4ef68bf352b8ca9"
     },
     "XML": {
       "Package": "XML",
