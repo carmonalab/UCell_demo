@@ -371,7 +371,7 @@ colData names(0):</code></pre>
 </div>
 <div id="ucell-seurat" class="section level3">
 <h3>UCell + Seurat</h3>
-<p>The function <code>AddModuleScore_UCell()</code> allows operating directly on Seurat objects. UCell scores are returned as metadata columns in the Seurat object. To see how this function differs from Seurat’s own <code>AddModuleScore()</code> (not based on per-cell ranks) see <a href="https://carmonalab.github.io/UCell/UCell_Seurat_vignette.html">this vignette</a></p>
+<p>The function <code>AddModuleScore_UCell()</code> allows operating directly on Seurat objects. UCell scores are returned as metadata columns in the Seurat object. To see how this function differs from Seurat’s own <code>AddModuleScore()</code> (not based on per-cell ranks) see <a href="https://carmonalab.github.io/UCell_demo/UCell_Seurat_vignette.html">this vignette</a></p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>seurat.object <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(<span class="at">counts =</span> exp.mat, <span class="at">project =</span> <span class="st">&quot;JerbyArnon&quot;</span>)</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>seurat.object <span class="ot">&lt;-</span> <span class="fu">AddModuleScore_UCell</span>(seurat.object, <span class="at">features =</span> signatures, <span class="at">name =</span> <span class="cn">NULL</span>,</span>
@@ -421,8 +421,8 @@ cy79_p1_CD45_neg_PDL1_pos_AS_C1_R1_G01_S73_comb 0.00000000</code></pre>
 </div>
 <div id="further-reading" class="section level2">
 <h2>Further reading</h2>
-<p>To see how UCell can interact directly with Seurat to analyse human PBMCs see <a href="https://carmonalab.github.io/UCell/UCell_Seurat_vignette.html">THIS VIGNETTE</a></p>
-<p>The code and the package are available at the UCell <a href="https://github.com/carmonalab/UCell">GitHub repository</a></p>
+<p>To see how UCell can interact directly with Seurat to analyse human PBMCs see <a href="https://carmonalab.github.io/UCell_demo/UCell_Seurat_vignette.html">THIS VIGNETTE</a></p>
+<p>The code and the package are available at the UCell <a href="https://github.com/carmonalab/UCell">GitHub repository</a>; more demos available at <a href="https://github.com/carmonalab/UCell_demo">UCell demo repository</a></p>
 </div>
 </div>
 

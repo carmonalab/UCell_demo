@@ -148,7 +148,7 @@ u.scores <- ScoreSignatures_UCell(exp.mat,features=signatures, ncores=4)
 melted <- reshape2::melt(u.scores)
 colnames(melted) <- c("Cell","Signature","Uscore")
 p <- ggplot(melted, aes(x=Signature, y=Uscore)) + geom_violin(aes(fill=Signature), scale = "width") +
-       geom_boxplot(width=0.1) + theme_bw() + theme(axis.text.x=element_blank())
+       geom_boxplot(width=0.1, outlier.size=0) + theme_bw() + theme(axis.text.x=element_blank())
 p
 ```
 
@@ -189,7 +189,7 @@ wrap_plots(pll)
 
 ### UCell + Seurat
 
-The function `AddModuleScore_UCell()` allows operating directly on Seurat objects. UCell scores are returned as metadata columns in the Seurat object. To see how this function differs from Seurat's own `AddModuleScore()` (not based on per-cell ranks) see [this vignette](https://carmonalab.github.io/UCell/UCell_Seurat_vignette.html)
+The function `AddModuleScore_UCell()` allows operating directly on Seurat objects. UCell scores are returned as metadata columns in the Seurat object. To see how this function differs from Seurat's own `AddModuleScore()` (not based on per-cell ranks) see [this vignette](https://carmonalab.github.io/UCell_demo/UCell_Seurat_vignette.html)
 ```{r}
 library(Seurat)
 seurat.object <- CreateSeuratObject(counts = exp.mat, project = "JerbyArnon")
@@ -215,9 +215,9 @@ FeaturePlot(seurat.object, reduction = "umap", features = names(signatures), nco
 
 ## Further reading
 
-To see how UCell can interact directly with Seurat to analyse human PBMCs see [THIS VIGNETTE](https://carmonalab.github.io/UCell/UCell_Seurat_vignette.html)
+To see how UCell can interact directly with Seurat to analyse human PBMCs see [THIS VIGNETTE](https://carmonalab.github.io/UCell_demo/UCell_Seurat_vignette.html)
 
-The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell)
+The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell); more demos available at [UCell demo repository](https://github.com/carmonalab/UCell_demo)
 
 
 

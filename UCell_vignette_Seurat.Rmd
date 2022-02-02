@@ -161,9 +161,9 @@ FeaturePlot(pbmc.Tcell.CD8, reduction = "wnn.umap", features = c("Tcell_CD8_UCel
 
 ## Further reading
 
-For more examples of UCell functionalities see [THIS DEMO](https://carmonalab.github.io/UCell/UCell_matrix_vignette.html)
+For more examples of UCell functionalities see [THIS DEMO](https://carmonalab.github.io/UCell_demo/UCell_matrix_vignette.html)
 
-The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell)
+The code and the package are available at the UCell [GitHub repository](https://github.com/carmonalab/UCell); more demos available at [UCell demo repository](https://github.com/carmonalab/UCell_demo)
 
 
 
