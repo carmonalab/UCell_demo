@@ -19,7 +19,7 @@ knit: (function(input_file, encoding) {
 #remotes::install_github("carmonalab/UCell", ref="dev")  #development version
 
 #system("R CMD build /Users/mass/Documents/Projects/Github/UCell")
-#system("R CMD INSTALL UCell_1.3.1.tar.gz")
+#system("R CMD INSTALL UCell_1.3.2.tar.gz")
 
 library(UCell)
 ```
