@@ -906,18 +906,20 @@
     },
     "UCell": {
       "Package": "UCell",
-      "Version": "1.3.1",
+      "Version": "1.99.1",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "UCell",
       "RemoteUsername": "carmonalab",
       "RemoteRef": "HEAD",
-      "RemoteSha": "a5b75e3a9a0f546cd843cddb5184f30fd313fee2",
-      "Hash": "d5c4a4b07478b9bef4db968a808760fb",
+      "RemoteSha": "77fad0fcc08129673ec4fa9eded3585b17be6771",
+      "Hash": "eb59045ec67eb3fbc51cb7018177cb50",
       "Requirements": [
         "BiocParallel",
         "Matrix",
+        "SingleCellExperiment",
+        "SummarizedExperiment",
         "data.table"
       ]
     },

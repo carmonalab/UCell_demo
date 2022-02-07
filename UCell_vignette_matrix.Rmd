@@ -1,7 +1,7 @@
 ---
 title: UCell signature enrichment analysis
 author: "M. Andreatta and S. Carmona"
-date: "02/02/2022"
+date: "07/02/2022"
 output:
   rmdformats::readthedown:
     self-contained: true
@@ -64,6 +64,7 @@ if (!file.exists(cached.object)) {
   getGEOSuppFiles(geo_acc)
   
   exp.mat <- read.csv(sprintf("%s/GSE115978_counts.csv.gz", geo_acc), header=T, row.names=1, sep=",")
+  
   saveRDS(exp.mat, cached.object)
 } else {
   exp.mat <- readRDS(cached.object)
@@ -157,12 +158,12 @@ p
 
 ### UCell + SingleCellExperiment
 
-The function `ScoreSignatures_UCell_sce()` allows operating directly on `sce` objects. UCell scores are returned in a altExp object (`altExp(sce, 'UCell'`))
+The function `ScoreSignatures_UCell()` allows operating directly on `sce` objects. UCell scores are returned in a altExp object (`altExp(sce, 'UCell'`))
 ```{r message=F, warning=F}
 library(SingleCellExperiment)
 
 sce <- SingleCellExperiment(list(counts=exp.mat))
-sce <- ScoreSignatures_UCell_sce(sce, features=signatures, assay = 'counts', name=NULL, ncores=4)
+sce <- ScoreSignatures_UCell(sce, features=signatures, assay = 'counts', name=NULL, ncores=4)
 altExp(sce, 'UCell')
 ```
 
