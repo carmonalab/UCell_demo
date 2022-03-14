@@ -45,7 +45,7 @@ The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_mul
 ## Installation
 
 ```{r message=F, warning=F, results=F}
-remotes::install_github("carmonalab/UCell")
+remotes::install_github("carmonalab/UCell", ref="v1.3")
 
 library(Seurat)
 library(UCell)

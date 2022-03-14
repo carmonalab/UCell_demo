@@ -45,9 +45,7 @@ opts_knit$set(width=75)
 ## Prepare environment
 
 ```{r message=F, warning=F, results=F}
-library(renv)
-renv::restore()
-#remotes::install_github("carmonalab/UCell")
+remotes::install_github("carmonalab/UCell", ref="v1.3")
 
 library(Seurat)
 library(UCell)
