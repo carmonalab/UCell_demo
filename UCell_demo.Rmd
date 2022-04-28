@@ -15,11 +15,9 @@ knit: (function(input_file, encoding) {
 
 ```{r message=F, warning=F}
 #renv::restore()
-#remotes::install_github("carmonalab/UCell", ref="v1.1")
-#remotes::install_github("carmonalab/UCell", ref="dev")  #development version
 
-#system("R CMD build /Users/mass/Documents/Projects/Github/UCell")
-#system("R CMD INSTALL UCell_1.3.2.tar.gz")
+BiocManager::install("UCell")
+#remotes::install_github("carmonalab/UCell", ref="dev")  #development version
 
 library(UCell)
 ```

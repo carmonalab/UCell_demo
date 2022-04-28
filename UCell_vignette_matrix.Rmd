@@ -43,7 +43,9 @@ In this demo, we will apply UCell to evaluate gene signatures in single-cell dat
 ## Installation
 
 ```{r message=F, warning=F, results=F}
-remotes::install_github("carmonalab/UCell", ref="v1.3")
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("UCell")
 library(UCell)
 set.seed(123)
 ```

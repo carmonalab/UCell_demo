@@ -45,7 +45,9 @@ opts_knit$set(width=75)
 ## Prepare environment
 
 ```{r message=F, warning=F, results=F}
-remotes::install_github("carmonalab/UCell", ref="v1.3")
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("UCell")
 
 library(Seurat)
 library(UCell)

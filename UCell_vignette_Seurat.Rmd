@@ -45,8 +45,9 @@ The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_mul
 ## Installation
 
 ```{r message=F, warning=F, results=F}
-remotes::install_github("carmonalab/UCell", ref="v1.3")
-
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("UCell")
 library(Seurat)
 library(UCell)
 set.seed(123)
