@@ -1,0 +1,152 @@
+---
+title: Test BiocNeighbors for UCell score smoothing
+author: 
+- Massimo Andreatta^[massimo.andreatta@unil.ch]
+- Santiago Carmona^[santiago.carmona@unil.ch]
+date: "03/08/2022"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'SmoothNN.html'))})
+#output: html_notebook
+---
+
+
+```{r message=F, warning=F}
+#renv::restore()
+
+#BiocManager::install("UCell")
+#remotes::install_github("carmonalab/UCell")  #development version
+
+library(UCell)
+```
+
+#Object at: https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A
+```{r}
+library(ggplot2)
+library(Seurat)
+library(SeuratDisk)
+
+reduction = "wnn.umap"
+#reduction = "umap"
+
+#pbmc <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+pbmc <- LoadH5Seurat("../Azimuth/data/pbmc_multimodal.h5seurat")
+
+DimPlot(object = pbmc, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
+DimPlot(object = pbmc, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
+```
+
+#Get some gene sets
+```{r}
+signatures <- list()
+signatures$CD4T <- c("CD4","CD40LG")
+signatures$CD8T <- c("CD8A","CD8B")
+signatures$Treg <- c("FOXP3","IL2RA")
+signatures$MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+signatures$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
+signatures$NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
+
+t1 <- Sys.time()
+pbmc <- AddModuleScore_UCell(pbmc, features = signatures, name = NULL, ncores=8)
+t2 <- Sys.time()
+t2 - t1
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4T","CD8T","Tcell_gd","MAIT"), max.cutoff = 'q99')
+
+```
+
+Find NN
+```{r}
+library(BiocNeighbors)
+k <- 10
+
+space <- pbmc@reductions$pca@cell.embeddings
+#space <- pbmc@reductions$wnn.umap@cell.embeddings
+
+nn <- findKNN(space, k=k, BNPARAM=AnnoyParam())
+```
+
+Time benchmark
+```{r eval=F}
+library(BiocNeighbors)
+k <- 50
+
+space <- pbmc@reductions$pca@cell.embeddings
+
+t1 <- Sys.time()
+#Method1
+nn <- findKNN(space, k=k, BNPARAM=AnnoyParam())
+t2 <- Sys.time()
+t2 - t1
+
+
+#Method2
+t1 <- Sys.time()
+nn <- findKNN(space, k=k, BNPARAM=HnswParam())
+t2 <- Sys.time()
+t2 - t1
+
+#Multi-core?
+t1 <- Sys.time()
+BPPARAM <- BiocParallel::MulticoreParam(workers = 8)
+#Method1
+nn <- findKNN(space, k=k, BNPARAM=AnnoyParam(), BPPARAM=BPPARAM)
+t2 <- Sys.time()
+t2 - t1
+```
+
+Did it work?
+```{r}
+DimPlot(pbmc, reduction = reduction, cells.highlight = nn$index[1,], sizes.highlight = 2, raster=F) +
+  NoLegend() + theme(aspect.ratio=1)
+DimPlot(pbmc, reduction = reduction, cells.highlight = nn$index[2,], sizes.highlight = 2, raster=F) +
+  NoLegend() + theme(aspect.ratio=1)
+
+maxrow <- which(nn$distance == max(nn$distance), arr.ind = TRUE)[1]
+nn$distance[maxrow,]
+
+DimPlot(pbmc, reduction = reduction, cells.highlight = nn$index[maxrow,], sizes.highlight = 2, raster=F) +
+  NoLegend() + theme(aspect.ratio=1)
+```
+
+
+Smooth UCell scores by averaging neighbors
+```{r}
+sig.cols <- names(signatures)
+data <- pbmc
+
+w.df <- vapply(sig.cols, FUN.VALUE = numeric(ncol(data)), FUN=function(x) {
+  
+  score.sig <- data@meta.data[,x]
+  weighted.scores <- vapply(X = 1:nrow(nn$index),
+                            FUN.VALUE = numeric(1),
+                            FUN = function(x) {
+                              r <- nn$index[x,]
+                              w <- 0.01 + 1/nn$distance[x,]
+                              sum(w * score.sig[r])/sum(w)
+                            })
+})
+rownames(w.df) <- colnames(data)
+colnames(w.df) <- paste0(colnames(w.df),"_NN")
+head(w.df)
+```
+
+Add to metadata
+```{r fig.height=3}
+pbmc <- AddMetaData(pbmc, metadata = as.data.frame(w.df))
+```
+
+```{r fig.height=3}
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN"), max.cutoff = 'q99')
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"), max.cutoff = 'q99')
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_NN","NK","NK_NN"), max.cutoff = 'q99')
+```
+
