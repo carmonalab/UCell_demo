@@ -17,7 +17,7 @@ knit: (function(input_file, encoding) {
 #renv::restore()
 
 BiocManager::install("UCell")
-#remotes::install_github("carmonalab/UCell", ref="dev")  #development version
+#remotes::install_github("carmonalab/UCell")  #development version
 
 library(UCell)
 ```
@@ -230,27 +230,39 @@ plot(pbmc.Tcell.CD8$Tcell_CD8_AUCell, pbmc.Tcell.CD8$Tcell_CD8_UCell)
 ## Test ranks storing functionality
 
 ```{r eval=F}
+t1 <- Sys.time()
 pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell, features = gene.sets, storeRanks = T)
+t2 <- Sys.time()
+t2 - t1
+
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_UCell")
 ```
 
 Check that scores calculate with rank pre-calculation are the same as those calculated "on the fly"
 ```{r eval=F}
+t1 <- Sys.time()
 pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = list(Tcell_CD8_copy=c("CD8A","CD8B")))
+t2 <- Sys.time()
+t2 - t1
+
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = "Tcell_CD8_copy_UCell")
 
 plot(pbmc.Tcell.UcellPrecomp$Tcell_CD8_UCell,pbmc.Tcell.UcellPrecomp$Tcell_CD8_copy_UCell)
 
+t1 <- Sys.time()
 pbmc.Tcell.UcellPrecomp <- AddModuleScore_UCell(pbmc.Tcell.UcellPrecomp, features = signatures.T)
+t2 <- Sys.time()
+t2 - t1
+
 VlnPlot(pbmc.Tcell.UcellPrecomp, features = paste0(names(signatures.T),"_UCell"))
 
 ```
 
 Gene ranks are stored here:
 ```{r eval=F}
-head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings[,1:10])
-head(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",1:10])
-hist(as.numeric(pbmc.Tcell.UcellPrecomp@misc$UCell$RNA$cells_rankings["CD8A",]))
+head(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data[,1:10])
+head(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data["CD8A",1:10])
+hist(as.numeric(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data["CD8A",]))
 ```
 
 
