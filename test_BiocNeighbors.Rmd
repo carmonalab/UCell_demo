@@ -17,7 +17,7 @@ knit: (function(input_file, encoding) {
 #renv::restore()
 
 #BiocManager::install("UCell")
-#remotes::install_github("carmonalab/UCell")  #development version
+#remotes::install_github("carmonalab/UCell", ref="dev")  #development version
 
 library(UCell)
 ```
@@ -31,8 +31,8 @@ library(SeuratDisk)
 reduction = "wnn.umap"
 #reduction = "umap"
 
-#pbmc <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
-pbmc <- LoadH5Seurat("../Azimuth/data/pbmc_multimodal.h5seurat")
+pbmc <- readRDS("data/pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+#pbmc <- LoadH5Seurat("../Azimuth/data/pbmc_multimodal.h5seurat")
 
 DimPlot(object = pbmc, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
 DimPlot(object = pbmc, reduction = "umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
@@ -118,14 +118,20 @@ Smooth UCell scores by averaging neighbors
 sig.cols <- names(signatures)
 data <- pbmc
 
-w.df <- vapply(sig.cols, FUN.VALUE = numeric(ncol(data)), FUN=function(x) {
+w.df <- vapply(sig.cols, FUN.VALUE = numeric(ncol(data)), FUN=function(s) {
   
-  score.sig <- data@meta.data[,x]
+  score.sig <- data@meta.data[,s]
   weighted.scores <- vapply(X = 1:nrow(nn$index),
                             FUN.VALUE = numeric(1),
                             FUN = function(x) {
                               r <- nn$index[x,]
-                              w <- 0.01 + 1/nn$distance[x,]
+                              r <- c(x,r)
+                              
+                              d <- nn$distance[x,]
+                              d <- c(d[1],d)
+                              
+                              w <- 1/(0.01+d)
+                              
                               sum(w * score.sig[r])/sum(w)
                             })
 })
@@ -141,12 +147,37 @@ pbmc <- AddMetaData(pbmc, metadata = as.data.frame(w.df))
 
 ```{r fig.height=3}
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN"), max.cutoff = 'q99')
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN"))
 
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"), max.cutoff = 'q99')
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))
 
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("Treg","Treg_NN","NK","NK_NN"), max.cutoff = 'q99')
+            features = c("Treg","Treg_NN","NK","NK_NN"))
 ```
+Using the new function implemented in UCell 2.1.2
+```{r fig.height=2.5, fig.width=4}
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="pca")
 
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_kNN","NK","NK_kNN"))
+
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="wnn.umap", suffix = "_UM")
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_UM","NK","NK_UM"))
+
+```
+Can we use it to smooth gene expression?
+```{r fig.height=2.5, fig.width=4}
+genes <- c("CD4","CD8A")
+expr <- as.matrix(pbmc@assays$SCT@data[genes,])
+
+pbmc <- AddMetaData(pbmc, metadata=as.data.frame(t(expr)))
+
+pbmc <- SmoothKNN(pbmc, signature.names = genes, reduction="pca", k=100)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4","CD4_kNN","CD8A","CD8A_kNN"))
+
+```
