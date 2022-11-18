@@ -155,7 +155,7 @@ FeaturePlot(pbmc, reduction = reduction,
 FeaturePlot(pbmc, reduction = reduction,
             features = c("Treg","Treg_NN","NK","NK_NN"))
 ```
-Using the new function implemented in UCell 2.1.2
+Using the new function implemented in UCell>=2.1.2
 ```{r fig.height=2.5, fig.width=4}
 pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="pca")
 
@@ -181,3 +181,57 @@ FeaturePlot(pbmc, reduction = reduction,
             features = c("CD4","CD4_kNN","CD8A","CD8A_kNN"))
 
 ```
+
+With SingleCellExperiment
+```{r}
+library(SingleCellExperiment)
+sce <- as.SingleCellExperiment(pbmc)
+
+sce <- SmoothKNN(sce, signature.names = c("CD4","CD8A","TCF7"),
+                 suffix = "smoothed", reduction = 'PCA', sce.expname = 'RNA')
+
+```
+
+Parallel processing
+```{r}
+library(BiocParallel)
+t1 <- Sys.time()
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="pca")
+t2 <- Sys.time()
+t2 - t1
+
+t1 <- Sys.time()
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="pca", BPPARAM = MulticoreParam(workers = 4))
+t2 <- Sys.time()
+t2 - t1
+```
+
+#Break cases:
+1) k > number of cells
+```{r}
+cells <- colnames(pbmc)[1:5]
+sub <- subset(pbmc, cells=cells)
+
+sub <- SmoothKNN(sub, signature.names = names(signatures), reduction="pca")
+```
+
+2) number of cells==1
+```{r}
+cells <- colnames(pbmc)[1]
+sub2 <- subset(pbmc, cells=cells)
+
+sub2 <- SmoothKNN(sub2, signature.names = names(signatures), reduction="pca")
+```
+
+3) UCell scoring with 1 cell in object
+```{r}
+cells <- colnames(pbmc)[1]
+sub2 <- subset(pbmc, cells=cells)
+
+sub2 <- AddModuleScore_UCell(sub2, features = signatures)
+```
+
+
+
+
+
