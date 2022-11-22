@@ -48,6 +48,7 @@ The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_mul
 if (!requireNamespace("BiocManager", quietly=TRUE))
     install.packages("BiocManager")
 BiocManager::install("UCell")
+
 library(Seurat)
 library(UCell)
 set.seed(123)
@@ -71,7 +72,7 @@ markers <- list()
 markers$Tcell_CD4 <- c("CD4","CD40LG")
 markers$Tcell_CD8 <- c("CD8A","CD8B")
 markers$Tcell_Treg <- c("FOXP3","IL2RA")
-markers$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+markers$Tcell_MAIT <- c("TRAV1-2","KLRB1")
 markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
 markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
 ```
@@ -80,11 +81,11 @@ markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3
 pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers)
 signature.names <- paste0(names(markers),"_UCell")
 
-VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l1")
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l1", pt.size = 0)
 ```
 
 ```{r fig.height=6, fig.width=10}
-VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l2")
+VlnPlot(pbmc.Tcell, features = signature.names, group.by = "celltype.l2", pt.size = 0)
 ```
 
 How do signatures compare to original annotations
@@ -93,8 +94,21 @@ Idents(pbmc.Tcell) <- "celltype.l2"
 DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
 ```
 
-```{r fig.height=5, fig.width=8}
-FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = signature.names, ncol=3, order=T)
+```{r fig.height=7, fig.width=13}
+FeaturePlot(pbmc.Tcell, reduction = "wnn.umap", features = signature.names, ncol=3)
+```
+
+## Smoothing UCell scores
+
+Single-cell data are sparse. It can be useful to ‘impute’ scores by neighboring cells and partially correct this sparsity. The function SmoothKNN performs smoothing of single-cell scores by weighted average of the k-nearest neighbors in a given dimensionality reduction. It can be applied directly on Seurat objects to smooth UCell scores:
+
+```{r fig.height=7, fig.width=13}
+pbmc.Tcell <- SmoothKNN(pbmc.Tcell,
+                           signature.names = signature.names,
+                           reduction="pca")
+
+FeaturePlot(pbmc.Tcell,  reduction = "wnn.umap",
+            features = paste0(signature.names,"_kNN"), ncol=3)
 ```
 
 ## Compare to AddModuleScore from Seurat
@@ -115,10 +129,10 @@ Note that applying the same signature to the complete set or to the CD8 T subset
 markers.cd8 <- list(Tcell_CD8=c("CD8A","CD8B"))
 
 pbmc.Tcell <- AddModuleScore(pbmc.Tcell, features = markers.cd8, name="Tcell_CD8_Seurat")
-a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_Seurat1")
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_Seurat1", pt.size = 0)
 
 pbmc.Tcell.CD8 <- AddModuleScore(pbmc.Tcell.CD8, features = markers.cd8, name="Tcell_CD8_Seurat")
-b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_Seurat1")
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_Seurat1", pt.size = 0)
 
 a | b
 
@@ -129,10 +143,10 @@ summary(pbmc.Tcell.CD8$Tcell_CD8_Seurat1)
 UCell score is based on gene rankings and therefore is not affected by the composition of the query dataset. Note that the score distribution is nearly identical for the same cell population in different datasets (small differences are due to random resolution of rank ties)
 ```{r}
 pbmc.Tcell <- AddModuleScore_UCell(pbmc.Tcell, features = markers.cd8)
-a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell")
+a <- VlnPlot(pbmc.Tcell, features = "Tcell_CD8_UCell", pt.size = 0)
 
 pbmc.Tcell.CD8 <- AddModuleScore_UCell(pbmc.Tcell.CD8, features = markers.cd8)
-b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell")
+b <- VlnPlot(pbmc.Tcell.CD8, features = "Tcell_CD8_UCell", pt.size = 0)
 
 a | b
 

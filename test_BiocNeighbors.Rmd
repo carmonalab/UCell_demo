@@ -170,26 +170,70 @@ FeaturePlot(pbmc, reduction = reduction,
 ```
 Can we use it to smooth gene expression?
 ```{r fig.height=2.5, fig.width=4}
-genes <- c("CD4","CD8A")
-expr <- as.matrix(pbmc@assays$SCT@data[genes,])
+pbmc <- SmoothKNN(pbmc, signature.names = genes <- c("CD4","CD8A"),
+                  assay="RNA", reduction="pca", k=20)
 
-pbmc <- AddMetaData(pbmc, metadata=as.data.frame(t(expr)))
+a <- FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4","CD8A"))
 
-pbmc <- SmoothKNN(pbmc, signature.names = genes, reduction="pca", k=100)
+DefaultAssay(pbmc) <- "RNA_kNN"
+b <- FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4","CD8A"))
+DefaultAssay(pbmc) <- "RNA"
 
-FeaturePlot(pbmc, reduction = reduction,
-            features = c("CD4","CD4_kNN","CD8A","CD8A_kNN"))
-
+a / b
 ```
 
 With SingleCellExperiment
-```{r}
+```{r fig.height=3}
 library(SingleCellExperiment)
+library(scater)
+library(scran)
+library(patchwork)
+set.seed(123)
+
 sce <- as.SingleCellExperiment(pbmc)
+#clean up metadata
+colData(sce) <- colData(sce)[,1:5]
 
+sce <- ScoreSignatures_UCell(sce, features=signatures,
+                             assay = "logcounts", name=NULL)
+
+#PCA and UMAP
+hvg <- getTopHVGs(sce, n=1000)
+sce <- runPCA(sce, scale=TRUE, ncomponents=20, subset_row=hvg)
+set.seed(1234)
+sce <- runUMAP(sce, dimred="PCA")
+
+pll <- lapply(names(signatures), function(x) {
+    plotUMAP(sce, colour_by = x, by_exprs_values = "UCell") + 
+       theme(aspect.ratio = 1)
+})
+wrap_plots(pll)
+```
+
+Signature smoothing
+```{r fig.height=3}
+sce <- SmoothKNN(sce, signature.names = names(signatures), 
+                 sce.expname = "UCell", reduction = 'PCA')
+
+pll <- lapply(paste0(names(signatures),"_kNN"), function(x) {
+    plotUMAP(sce, colour_by = x, by_exprs_values = "UCell_kNN") + 
+       theme(aspect.ratio = 1)
+})
+wrap_plots(pll)
+```
+
+Gene expression smoothing
+```{r}
 sce <- SmoothKNN(sce, signature.names = c("CD4","CD8A","TCF7"),
-                 suffix = "smoothed", reduction = 'PCA', sce.expname = 'RNA')
+                 suffix = "_kNN", reduction = 'PCA',
+                 sce.expname = "main", sce.assay = "logcounts")
 
+altExp(sce, "main_kNN")
+a <- plotUMAP(sce, colour_by = "CD8A", by_exprs_values = "logcounts")
+b <- plotUMAP(sce, colour_by = "CD8A_kNN", by_exprs_values = "main_kNN")
+a | b
 ```
 
 Parallel processing
