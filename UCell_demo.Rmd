@@ -16,7 +16,7 @@ knit: (function(input_file, encoding) {
 ```{r message=F, warning=F}
 #renv::restore()
 
-BiocManager::install("UCell")
+#BiocManager::install("UCell")
 #remotes::install_github("carmonalab/UCell")  #development version
 
 library(UCell)
@@ -107,7 +107,7 @@ signatures.T <- list()
 signatures.T$Tcell_CD4 <- c("CD4","CD40LG")
 signatures.T$Tcell_CD8 <- c("CD8A","CD8B")
 signatures.T$Tcell_Treg <- c("FOXP3","IL2RA")
-signatures.T$Tcell_MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+signatures.T$Tcell_MAIT <- c("SLC4A10", "TRAV1-2")
 signatures.T$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
 signatures.T$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
 ```
@@ -270,7 +270,7 @@ hist(as.numeric(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data["CD8A",]))
 http://www.bioconductor.org/packages/release/bioc/vignettes/escape/inst/doc/vignette.html#3_Enrichment
 
 ```{r}
-devtools::install_github("ncborcherding/escape")
+#devtools::install_github("ncborcherding/escape")
 
 library(escape)
 #library(dittoSeq)

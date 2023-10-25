@@ -47,7 +47,8 @@ The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_mul
 ```{r message=F, warning=F, results=F}
 if (!requireNamespace("BiocManager", quietly=TRUE))
     install.packages("BiocManager")
-BiocManager::install("UCell")
+#BiocManager::install("UCell")
+#remotes::install_github("carmonalab/UCell", ref="RELEASE_3_18")
 
 library(Seurat)
 library(UCell)
@@ -72,7 +73,7 @@ markers <- list()
 markers$Tcell_CD4 <- c("CD4","CD40LG")
 markers$Tcell_CD8 <- c("CD8A","CD8B")
 markers$Tcell_Treg <- c("FOXP3","IL2RA")
-markers$Tcell_MAIT <- c("TRAV1-2","KLRB1")
+markers$Tcell_MAIT <- c("TRAV1-2","SLC4A10")
 markers$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
 markers$Tcell_NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
 ```

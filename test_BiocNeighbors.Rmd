@@ -39,14 +39,14 @@ DimPlot(object = pbmc, reduction = "umap", group.by = "celltype.l2", label = TRU
 ```
 
 #Get some gene sets
-```{r}
+```{r fig.height=6}
 signatures <- list()
 signatures$CD4T <- c("CD4","CD40LG")
 signatures$CD8T <- c("CD8A","CD8B")
 signatures$Treg <- c("FOXP3","IL2RA")
-signatures$MAIT <- c("KLRB1", "SLC4A10", "NCR3")
+signatures$MAIT <- c("TRAV1-2","SLC4A10")
 signatures$Tcell_gd <- c("TRDC", "TRGC1", "TRGC2", "TRDV1","TRAC-","TRBC1-","TRBC2-")
-signatures$NK <- c("FGFBP2", "SPON2", "KLRF1", "FCGR3A", "KLRD1", "TRDC","CD3E-","CD3G-")
+signatures$NK <- c("KLRD1","NKG7","NCR1","FCGR3A","CD3D-","CD3E-","CD3G-","CD8A-","CD8B-")
 
 t1 <- Sys.time()
 pbmc <- AddModuleScore_UCell(pbmc, features = signatures, name = NULL, ncores=8)
@@ -54,14 +54,15 @@ t2 <- Sys.time()
 t2 - t1
 
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("CD4T","CD8T","Tcell_gd","MAIT"), max.cutoff = 'q99')
+            features = c("CD4T","CD8T","Tcell_gd","MAIT"), max.cutoff = 'q99') &
+  theme(aspect.ratio = 1)
 
 ```
 
 Find NN
 ```{r}
 library(BiocNeighbors)
-k <- 10
+k <- 20
 
 space <- pbmc@reductions$pca@cell.embeddings
 #space <- pbmc@reductions$wnn.umap@cell.embeddings
@@ -141,36 +142,140 @@ head(w.df)
 ```
 
 Add to metadata
-```{r fig.height=3}
+```{r fig.height=7}
 pbmc <- AddMetaData(pbmc, metadata = as.data.frame(w.df))
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN")) & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))  & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_NN","NK","NK_NN"))  & theme(aspect.ratio = 1)
 ```
 
-```{r fig.height=3}
-FeaturePlot(pbmc, reduction = reduction,
-            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN"))
-
-FeaturePlot(pbmc, reduction = reduction,
-            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))
-
-FeaturePlot(pbmc, reduction = reduction,
-            features = c("Treg","Treg_NN","NK","NK_NN"))
+Smooth UCell scores by neighbor rank with decay function
+```{r}
+knn_smooth_scores <- function(
+    matrix=NULL,
+    nn=NULL,
+    decay=0.2,   #decay must be bound between 0 and 1
+    up.only=FALSE #scores can only increase
+) {
+  
+  sig.cols <- colnames(matrix)
+  w.df <- vapply(sig.cols, FUN.VALUE=numeric(nrow(matrix)), FUN=function(s) {
+    
+    ss.scores <- matrix[,s]
+    
+    weighted.scores <- vapply(X = seq_len(nrow(nn$index)),
+                              FUN.VALUE = numeric(1),
+                              FUN = function(x) {
+                                r <- nn$index[x,]
+                                r <- c(x,r)
+                                
+                                i <- seq(0, length(r)-1)
+                                
+                                w <- (1-decay)**i
+                                
+                                sum(w * ss.scores[r])/sum(w)
+                              })
+    if (up.only) {
+      pmax(weighted.scores, ss.scores)
+    } else {
+      weighted.scores
+    }
+  })
+  
+  
+  rownames(w.df) <- rownames(matrix)
+  as.data.frame(w.df)
+}  
 ```
-Using the new function implemented in UCell>=2.1.2
-```{r fig.height=2.5, fig.width=4}
-pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="pca")
+
+```{r fig.height=7}
+matrix <- pbmc@meta.data[,names(signatures)]
+
+m <- knn_smooth_scores(matrix=matrix, nn=nn, decay=0.2)
+colnames(m) <- paste0(colnames(m),"_NN")
+
+pbmc <- AddMetaData(pbmc, metadata = m)
 
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("Treg","Treg_kNN","NK","NK_kNN"))
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN")) & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))  & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_NN","NK","NK_NN"))  & theme(aspect.ratio = 1)
+```
+
+```{r fig.height=7}
+matrix <- pbmc@meta.data[,names(signatures)]
+
+m <- knn_smooth_scores(matrix=matrix, nn=nn, decay=1)
+colnames(m) <- paste0(colnames(m),"_NN")
+pbmc <- AddMetaData(pbmc, metadata = m)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN")) & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))  & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_NN","NK","NK_NN"))  & theme(aspect.ratio = 1)
+```
+
+
+```{r fig.height=7}
+matrix <- pbmc@meta.data[,names(signatures)]
+
+m <- knn_smooth_scores(matrix=matrix, nn=nn, decay=0.1, up.only = T)
+colnames(m) <- paste0(colnames(m),"_NN")
+
+pbmc <- AddMetaData(pbmc, metadata = m)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("CD4T","CD4T_NN","CD8T","CD8T_NN")) & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Tcell_gd","Tcell_gd_NN","MAIT","MAIT_NN"))  & theme(aspect.ratio = 1)
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_NN","NK","NK_NN"))  & theme(aspect.ratio = 1)
+```
+
+
+
+
+Using the new function implemented in UCell
+```{r fig.height=6}
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures))
+
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_kNN","CD4T","CD4T_kNN")) & theme(aspect.ratio = 1)
+
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), decay=0.01, k = 50)
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_kNN","CD4T","CD4T_kNN")) & theme(aspect.ratio = 1)
+
+pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), up.only = TRUE)
+FeaturePlot(pbmc, reduction = reduction,
+            features = c("Treg","Treg_kNN","CD4T","CD4T_kNN")) & theme(aspect.ratio = 1)
+
 
 pbmc <- SmoothKNN(pbmc, signature.names = names(signatures), reduction="wnn.umap", suffix = "_UM")
 
 FeaturePlot(pbmc, reduction = reduction,
-            features = c("Treg","Treg_UM","NK","NK_UM"))
+            features = c("Treg","Treg_UM","CD4T","CD4T_UM")) & theme(aspect.ratio = 1)
 
 ```
 Can we use it to smooth gene expression?
-```{r fig.height=2.5, fig.width=4}
-pbmc <- SmoothKNN(pbmc, signature.names = genes <- c("CD4","CD8A"),
+```{r fig.height=6}
+pbmc <- SmoothKNN(pbmc, signature.names = c("CD4","CD8A"),
                   assay="RNA", reduction="pca", k=20)
 
 a <- FeaturePlot(pbmc, reduction = reduction,
@@ -185,7 +290,7 @@ a / b
 ```
 
 With SingleCellExperiment
-```{r fig.height=3}
+```{r fig.height=6}
 library(SingleCellExperiment)
 library(scater)
 library(scran)
@@ -213,7 +318,7 @@ wrap_plots(pll)
 ```
 
 Signature smoothing
-```{r fig.height=3}
+```{r fig.height=6}
 sce <- SmoothKNN(sce, signature.names = names(signatures), 
                  sce.expname = "UCell", reduction = 'PCA')
 
@@ -225,7 +330,7 @@ wrap_plots(pll)
 ```
 
 Gene expression smoothing
-```{r}
+```{r fig.height=4}
 sce <- SmoothKNN(sce, signature.names = c("CD4","CD8A","TCF7"),
                  suffix = "_kNN", reduction = 'PCA',
                  sce.expname = "main", sce.assay = "logcounts")
@@ -275,7 +380,10 @@ sub2 <- subset(pbmc, cells=cells)
 sub2 <- AddModuleScore_UCell(sub2, features = signatures)
 ```
 
-
-
+4) k=0 or k=1
+```{r}
+tmp <- SmoothKNN(pbmc, signature.names = names(signatures), k=0)
+tmp <- SmoothKNN(pbmc, signature.names = names(signatures), k=1)
+```
 
 
