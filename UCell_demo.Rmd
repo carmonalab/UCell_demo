@@ -17,7 +17,7 @@ knit: (function(input_file, encoding) {
 #renv::restore()
 
 #BiocManager::install("UCell")
-#remotes::install_github("carmonalab/UCell")  #development version
+#remotes::install_github("carmonalab/UCell", ref="dev_local")  #development version
 
 library(UCell)
 ```
@@ -147,7 +147,7 @@ p1 | p2
 ```
 
 Evaluate more signatures for all flavors of T cells
-```{r fig.height=3}
+```{r fig.height=10}
 pbmc.Tcell.ss  <- AddModuleScore_UCell(pbmc.Tcell, features = signatures.T)
 sign.names <- paste0(names(signatures.T),"_UCell")
 
@@ -156,7 +156,7 @@ VlnPlot(pbmc.Tcell.ss, features = sign.names, group.by = "celltype.l2")
 ```
 
 How do signatures compare to original annotations
-```{r fig.height=3}
+```{r fig.height=8}
 Idents(pbmc.Tcell.ss) <- "celltype.l2"
 DimPlot(object = pbmc.Tcell.ss, reduction = "wnn.umap", group.by = "celltype.l2", label.size = 3, repel = TRUE, label = T)
 FeaturePlot(pbmc.Tcell.ss, reduction = "wnn.umap", features = sign.names, ncol=3, order=T)
@@ -265,49 +265,6 @@ head(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data["CD8A",1:10])
 hist(as.numeric(pbmc.Tcell.UcellPrecomp@assays$UCellRanks@data["CD8A",]))
 ```
 
-
-# Test escape enrichIT
-http://www.bioconductor.org/packages/release/bioc/vignettes/escape/inst/doc/vignette.html#3_Enrichment
-
-```{r}
-#devtools::install_github("ncborcherding/escape")
-
-library(escape)
-#library(dittoSeq)
-#library(SingleCellExperiment)
-#pbmc.sce <- as.SingleCellExperiment(pbmc.Tcell)
-```
-
-```{r}
-library(GSEABase)
-#check format for gene sets
-GS <- getGeneSets(library = "H")
-
-gsets <- list()
-for (sig in names(signatures.T)) {
-   gsets[[sig]] <- GeneSet(signatures.T[[sig]], setName=sig)
-}
-gsc <- GeneSetCollection(gsets)
-
-esc.res <- enrichIt(pbmc.Tcell, gene.sets = gsc, groups = 1000)
-
-```
-
-Very slow, and gives scores in strange multimodal distributions...
-```{r}
-colnames(esc.res) <- paste0(colnames(esc.res), "_enrichIT")
-
-pbmc.Tcell <- AddMetaData(pbmc.Tcell, esc.res)
-VlnPlot(pbmc.Tcell, features = colnames(esc.res))
-```
-
-Export small subset as sample data for the package
-```{r}
-Idents(pbmc.Tcell) <- "celltype.l1"
-pbmc.ds <- subset(pbmc.Tcell, cells=WhichCells(pbmc.Tcell,downsample=200))
-sample.matrix <- pbmc.ds@assays$RNA@data
-save(sample.matrix, file="sample.matrix.RData")
-```
 
 
 # Test ties methods
