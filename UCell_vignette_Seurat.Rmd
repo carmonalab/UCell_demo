@@ -1,7 +1,7 @@
 ---
 title: UCell signature enrichment - interacting with Seurat
 author: "M. Andreatta and S. Carmona"
-date: "02/02/2022"
+date: "29/04/2025"
 output:
   rmdformats::readthedown:
     self-contained: true
@@ -47,8 +47,7 @@ The [original dataset](https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_mul
 ```{r message=F, warning=F, results=F}
 if (!requireNamespace("BiocManager", quietly=TRUE))
     install.packages("BiocManager")
-#BiocManager::install("UCell")
-#remotes::install_github("carmonalab/UCell", ref="RELEASE_3_18")
+BiocManager::install("UCell")
 
 library(Seurat)
 library(UCell)
@@ -57,11 +56,18 @@ set.seed(123)
 
 ## Query single-cell data
 
-Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1) at the following link: [pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds](https://drive.switch.ch/index.php/s/3kM5PQ0tQaG6d6A) 
+Obtain a downsampled version of the data from [Hao and Hao et al, bioRvix 2020](https://www.biorxiv.org/content/10.1101/2020.10.12.335331v1), either programmatically (see below) or from [FigShare](https://doi.org/10.6084/m9.figshare.28891538.v1)
+```{r}
+options(timeout = 3000)
+url <- "https://figshare.com/ndownloader/files/54054143"
+download.file(url, destfile = "data/pbmc_multimodal.Tcells_ds9k.rds")
+```
 
 Then load the object and visualize the clustering annotation by the authors.
 ```{r}
-pbmc.Tcell <- readRDS("pbmc_multimodal.downsampled20k.Tcell.seurat.RNA.rds")
+pbmc.Tcell <- readRDS("data/pbmc_multimodal.Tcells_ds9k.rds")
+pbmc.Tcell <- RenameAssays(pbmc.Tcell, assay.name = "SCT", new.assay.name = "RNA")
+
 DimPlot(object = pbmc.Tcell, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE)
 ```
 

@@ -75,7 +75,7 @@ if (!file.exists(cached.object)) {
 
 ## Define gene signatures
 
-Here we define some simple gene sets based on the "Human Cell Landscape" signatures [Han et al. (2020) Nature](https://www.nature.com/articles/s41586-020-2157-4). You may edit existing signatures, or add new one as elements in a list.
+Here we define some simple gene sets based on the "Human Cell Landscape" signatures [Han et al. (2020) Nature](https://www.nature.com/articles/s41586-020-2157-4). You may edit existing signatures, or add new ones as elements in a list.
 ```{r}
 signatures <- list(
     Immune = c("PTPRC"),
