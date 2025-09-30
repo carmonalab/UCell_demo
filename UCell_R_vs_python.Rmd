@@ -1,0 +1,51 @@
+---
+title: UCell demo
+author: 
+- Massimo Andreatta^[massimo.andreatta@unil.ch]
+- Santiago Carmona^[santiago.carmona@unil.ch]
+date: "15/02/2021"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+#output: html_notebook
+---
+
+
+```{r message=F, warning=F}
+#renv::restore()
+
+BiocManager::install("UCell")
+#remotes::install_github("carmonalab/UCell")  #development version
+
+library(UCell)
+```
+
+Read in AnnData object used for python testing
+```{r}
+library(zellkonverter)
+library(SingleCellExperiment)
+
+sce <- readH5AD("data/pbmc3k_raw.h5ad")
+
+assay(sce, "counts") <- assay(sce, "X")
+assay(sce, "logcounts") <- assay(sce, "X")
+seu <- as.Seurat(sce)
+seu <- NormalizeData(seu)
+
+seu@assays$originalexp@counts[c("CD2","PTPRC"),1:5]
+```
+
+```{r}
+signatures = list()
+signatures$T_cell = c("CD3D","CD3E","CD2")
+signatures$B_cell = c('MS4A1', 'CD79A', 'CD79B')
+
+seu <- AddModuleScore_UCell(seu, features = signatures, slot = "counts", maxRank = 1500)
+```
+
+```{r}
+head(seu[[]])
+```
+
