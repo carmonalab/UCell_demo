@@ -1,0 +1,330 @@
+---
+title: UCell signature enrichment - interacting with Seurat
+author: "M. Andreatta and S. Carmona"
+date: "29/04/2025"
+output:
+  rmdformats::readthedown:
+    self-contained: true
+    highlight: haddock
+    thumbnails: false
+    css: styles.css
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file, encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_Seurat_vignette.html'))})
+---
+
+```{r setup, echo=FALSE, message=F, warning=F, results=F}
+#install.packages("rmdformats")
+#Template markdown setup
+library(knitr)
+library(rmdformats)
+library(formatR)
+library(renv)
+#renv::restore()
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               cache.lazy=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               dev='png')
+opts_knit$set(width=75)
+
+```
+
+## Installation
+
+```{r message=F, warning=F, results=F}
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("UCell")
+
+#remotes::install_github("mojaveazure/seurat-disk")
+#library(SeuratDisk)
+
+
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(UCell)
+set.seed(123)
+```
+
+## Prepare data
+
+From a large PBMC datasets, extract a few populations with clear markers. These will be used to illustrate signature scores.
+
+Download reference from: https://atlas.fredhutch.org/data/nygc/multimodal/pbmc_multimodal.h5seurat
+```{r}
+set.seed(42)
+#data <- LoadH5Seurat("data/pbmc_multimodal.h5seurat")
+data <- readRDS("../BCC_Kuonen/cache/BCC_all_LY_clean_annotated.rds")
+```
+
+```{r}
+DimPlot(data)
+```
+Helper function for plots
+```{r}
+simplify_plot <- function() {
+  theme(
+    axis.title = element_blank(),
+    axis.text  = element_blank(),
+    axis.ticks = element_blank(),
+    aspect.ratio = 1
+  )
+}
+```
+
+Subset on RNA and on three populations
+```{r}
+data <- subset(data, annotation %in% c("Tcell","Melanocyte"))
+
+data <- FindVariableFeatures(data, nfeatures = 1000)
+data <- RunPCA(data, npcs = 20)
+data <- RunUMAP(data, dims = 1:20)
+```
+
+```{r}
+DimPlot(data, group.by = "annotation")
+```
+
+```{r}
+soft_three_colors <- c(
+  "#A6CEE3",
+  "#B2DF8A",
+  "#FDBF6F"   
+)
+```
+
+```{r fig.height=4}
+data <- FindNeighbors(data, reduction = "pca")
+data <- FindClusters(data, resolution = 0.05)
+DimPlot(data, group.by = "seurat_clusters") & simplify_plot() & scale_color_manual(values = soft_three_colors)
+```
+
+Make some signatures to highlight clusters
+```{r}
+mark <- FindAllMarkers(data, group.by = "seurat_clusters", only.pos = 1, max.cells.per.ident = 1000, min.diff.pct = 0.1)
+
+head(mark[mark$cluster==0,],10)
+head(mark[mark$cluster==1,],10)
+head(mark[mark$cluster==2,],10)
+```
+
+```{r fig.height=5, fig.width=10}
+FeaturePlot(data, features = c("CD4","CD8A","CD8B","CCL5","NKG7","IL7R"), ncol=3) & theme(aspect.ratio=1)
+```
+
+```{r}
+sigs <- list()
+sigs$Tcell <- c("CD2","CD3E","CD3D","CD3G","TRAC")
+sigs$cytotox <- c("NKG7","GZMA","PRF1","GLNY")
+sigs$Tmem <- c("IL7R","TCF7","LTB","CCR7")
+sigs$CD8T <- c("CD8A","CD8B")
+sigs$CD4T <- c("CD4","CD40LG")
+sigs$melanocyte <- c("PMEL","MLANA","CAPN3")
+
+data <- AddModuleScore_UCell(data, features = sigs, name = "")
+```
+
+```{r fig.height=8, fig.width=14}
+library(viridis)
+
+p <- FeaturePlot(data, features = names(sigs), ncol=3, max.cutoff = "q99") & simplify_plot()
+#p
+
+p & scale_color_viridis_c(option = "H") & theme(legend.position = "right")
+
+#custom_colors <- c(
+#  "#D9D9D1",  # light gray
+#  "#FFF176",  # soft yellow
+#  "#FFB74D",  # light orange
+#  "#FF7043",  # medium orange-red
+#  "#E53935",  # red
+#  "#8B0000"   # dark red
+#)
+
+custom_colors <- c(
+  "#E0E0E0",  # light gray (lowest values)
+  "#ADD8E6",  # light blue
+  "#6495ED",  # medium blue
+  "#1E90FF",  # strong blue
+  "#0B3D91"   # dark blue (highest values)
+)
+
+my_palette <- colorRampPalette(custom_colors)
+
+p & scale_color_gradientn(colors = my_palette(100))
+
+```
+kNN smoothing
+```{r fig.height=8, fig.width=14}
+data <- SmoothKNN(data, signature.names = names(sigs), k = 20, decay = 0.1)
+
+p <- FeaturePlot(data, features = paste0(names(sigs), "_kNN"), ncol=3, max.cutoff = "q99") & simplify_plot()
+p & scale_color_gradientn(colors = my_palette(100))
+```
+
+```{r fig.height=8, fig.width=14}
+data <- SmoothKNN(data, signature.names = names(sigs), k = 20, decay = 0.05)
+
+p <- FeaturePlot(data, features = paste0(names(sigs), "_kNN"), ncol=3, max.cutoff = "q99") & simplify_plot()
+p & scale_color_gradientn(colors = my_palette(100))
+```
+
+
+```{r}
+p <- FeaturePlot(data, features = c("NK","NK_kNN"), ncol=2, max.cutoff = "q99") & simplify_plot()
+p & scale_color_gradientn(colors = my_palette(100))
+
+p <- FeaturePlot(data, features = c("CD4T","CD4T_kNN"), ncol=2, max.cutoff = "q99") & simplify_plot()
+p & scale_color_gradientn(colors = my_palette(100))
+
+p <- FeaturePlot(data, features = c("melanocyte","melanocyte_kNN"), ncol=2, max.cutoff = "q99") & simplify_plot()
+p & scale_color_gradientn(colors = my_palette(100))
+
+```
+
+```{r fig.height=2.5, fig.width=3}
+VlnPlot(data, features = c("NK_kNN"), group.by = "seurat_clusters", pt.size=0, cols = soft_three_colors)
+VlnPlot(data, features = c("melanocyte_kNN"), group.by = "seurat_clusters", pt.size=0, cols = soft_three_colors)
+```
+
+```{r fig.height=2.5, fig.width=3}
+max.u <- max(data$CD4T)
+
+VlnPlot(data, features = c("CD4T"), group.by = "seurat_clusters", pt.size=0, cols = soft_three_colors) + ylim(0,max.u)
+VlnPlot(data, features = c("CD4T_kNN"), group.by = "seurat_clusters", pt.size=0, cols = soft_three_colors) + ylim(0,max.u)
+```
+
+Average by sample
+```{r}
+#Aggregate by sample and cluster
+data$Sample_cluster <- paste(data$Sample, data$seurat_clusters, sep = "_c")
+
+meta <- data@meta.data[,names(sigs),drop=F]
+avgs <- lapply(unique(colnames(meta)), function(m) {
+    tapply(meta[,m], data$Sample_cluster, mean)
+})
+names(avgs) <- colnames(meta)
+avgs <- as.data.frame(avgs)
+
+avgs$Sample_sub <- rownames(avgs)
+melt.sig <- reshape2::melt(avgs)
+colnames(melt.sig) <- c("Sample_cluster","Signature","value")
+
+#Aggregate meta-features
+library(dplyr)
+library(tidyr)
+melt.sig <- melt.sig %>% separate(Sample_cluster, c('Sample', 'Cluster'),
+                                sep="_", remove=F)
+```
+
+Plot pseudo-bulks
+```{r fig.height=5, fig.width=8}
+library(ggpubr)
+library(patchwork)
+which.sigs <- as.character(unique(melt.sig$Signature))
+
+pll <- lapply(which.sigs, function(g) {
+  max.u <- max(data@meta.data[,g])
+  df.use <- melt.sig[melt.sig$Signature == g,]
+  
+  ggplot(df.use, aes(x=Cluster, y=value, color=Cluster, fill=NULL)) + coord_cartesian(ylim = c(0, max.u)) +
+    geom_boxplot(outlier.shape = NA) + 
+    geom_dotplot(binaxis='y', stackdir='center', dotsize=0.8,
+                 position=position_dodge(0.8)) +
+    theme_classic() + ggtitle(g) + scale_color_manual(values=soft_three_colors) 
+#    stat_pwc(aes(group = Cluster), label = "p.signif", label.size=4, method = "wilcox_test", hide.ns = F)
+})
+names(pll) <- which.sigs
+
+for (i in 1:(length(pll)-1)) {
+  pll[[i]] <- pll[[i]]
+}
+wrap_plots(pll)
+
+```
+
+```{r fig.height=3, fig.width=2.5}
+pll[["melanocyte"]] + NoLegend() + theme(aspect.ratio = 1)
+pll[["cytotox"]] + NoLegend() + theme(aspect.ratio = 1)
+```
+
+# Simulate a condition (split patients into two groups)
+
+```{r}
+data$Condition = "Cond1"
+data$Condition[data$Sample %in% c("LY31120","LY261021","LY021121")] <- "Cond2"
+```
+
+```{r}
+cond_colors <- c("#E9C46A","#B22222")   
+```
+
+```{r fig.height=2.5, fig.width=3}
+VlnPlot(data, features = c("NK_kNN"), group.by = "seurat_clusters", split.by = "Condition", pt.size=0, cols = cond_colors)
+VlnPlot(data, features = c("melanocyte_kNN"), group.by = "seurat_clusters", split.by = "Condition", pt.size=0, cols = cond_colors)
+```
+
+
+Average by sample
+```{r}
+#Aggregate by sample and cluster
+data$Sample_cluster_cond <- paste(data$Sample, data$seurat_clusters, data$Condition, sep = "_")
+
+meta <- data@meta.data[,names(sigs),drop=F]
+avgs <- lapply(unique(colnames(meta)), function(m) {
+    tapply(meta[,m], data$Sample_cluster_cond, mean)
+})
+names(avgs) <- colnames(meta)
+avgs <- as.data.frame(avgs)
+
+avgs$Sample_sub <- rownames(avgs)
+melt.sig <- reshape2::melt(avgs)
+colnames(melt.sig) <- c("Sample_cluster","Signature","value")
+
+#Aggregate meta-features
+library(dplyr)
+library(tidyr)
+melt.sig <- melt.sig %>% separate(Sample_cluster, c('Sample', 'Cluster', 'Condition'),
+                                sep="_", remove=F)
+```
+
+Plot pseudo-bulks
+```{r fig.height=5, fig.width=8}
+library(ggpubr)
+library(patchwork)
+which.sigs <- as.character(unique(melt.sig$Signature))
+
+pll <- lapply(which.sigs, function(g) {
+  max.u <- max(data@meta.data[,g])
+  df.use <- melt.sig[melt.sig$Signature == g,]
+  
+  ggplot(df.use, aes(x=Cluster, y=value, color=Condition, fill=NULL)) + coord_cartesian(ylim = c(0, max.u)) +
+    geom_boxplot(outlier.shape = NA) + 
+    geom_dotplot(binaxis='y', stackdir='center', dotsize=0.8,
+                 position=position_dodge(0.8)) +
+    theme_classic() + ggtitle(g) + scale_color_manual(values=cond_colors) 
+#    stat_pwc(aes(group = Cluster), label = "p.signif", label.size=4, method = "wilcox_test", hide.ns = F)
+})
+names(pll) <- which.sigs
+
+for (i in 1:(length(pll)-1)) {
+  pll[[i]] <- pll[[i]]
+}
+wrap_plots(pll)
+
+```
+
+```{r fig.height=3, fig.width=2.5}
+pll[["melanocyte"]]  + theme(aspect.ratio = 2)
+pll[["cytotox"]]  + theme(aspect.ratio = 2)
+```
