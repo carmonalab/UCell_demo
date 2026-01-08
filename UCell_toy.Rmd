@@ -247,7 +247,7 @@ melt.sig <- melt.sig %>% separate(Sample_cluster, c('Sample', 'Cluster'),
 
 Plot pseudo-bulks
 ```{r fig.height=5, fig.width=8}
-library(ggpubr)
+#library(ggpubr)
 library(patchwork)
 which.sigs <- as.character(unique(melt.sig$Signature))
 
@@ -345,7 +345,7 @@ melt.sig <- melt.sig %>% separate(Sample_cluster, c('Sample', 'Cluster', 'Condit
 
 Plot pseudo-bulks
 ```{r fig.height=5, fig.width=8}
-library(ggpubr)
+#library(ggpubr)
 library(patchwork)
 which.sigs <- as.character(unique(melt.sig$Signature))
 
@@ -398,4 +398,40 @@ pll[["melanocyte"]]  + theme(aspect.ratio = 1.2)
 ggsave("plots/melanocyte_jitter_cond.pdf", height=2, width=4.5)
 
 pll[["cytotox"]]  + theme(aspect.ratio = 1.2)
+```
+
+
+Using a mixed-effect model
+```{r}
+library(lme4)
+library(lmerTest)
+
+df <- data@meta.data
+
+model <- lmer(melanocyte ~ seurat_clusters * Condition + (1 | Sample), data = df)
+summary(model)
+```
+
+```{r}
+model <- lmer(melanocyte ~ seurat_clusters + (1 | Sample), data = df)
+summary(model)
+```
+
+```{r}
+library(emmeans)
+library(ggplot2)
+
+emm <- emmeans(model, ~ seurat_clusters)
+emm_df <- as.data.frame(emm)
+
+ggplot(emm_df, aes(x = seurat_clusters, y = emmean)) +
+  geom_col(fill = "gray80", width = 0.6) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.1) +
+  labs(y = "Adjusted mean melanocyte UCell score", x = "Cluster") +
+  theme_classic(base_size = 12)
+
+df_summary <- df %>%
+  group_by(Sample, seurat_clusters) %>%
+  summarise(mean_score = mean(melanocyte), .groups = "drop")
+
 ```
