@@ -1,0 +1,185 @@
+---
+title: UCell signature enrichment in spatial data (CosMx)
+author: "M. Andreatta and S. Carmona"
+date: "08/01/2026"
+output:
+  rmdformats::readthedown:
+    self-contained: true
+    highlight: haddock
+    thumbnails: false
+    css: styles.css
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file, encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'UCell_cosmx.html'))})
+---
+
+```{r setup, echo=FALSE, message=F, warning=F, results=F}
+#install.packages("rmdformats")
+#Template markdown setup
+library(knitr)
+library(rmdformats)
+library(formatR)
+library(renv)
+#renv::restore()
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               cache.lazy=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               dev='png')
+opts_knit$set(width=75)
+
+```
+
+## Installation
+
+```{r message=F, warning=F, results=F}
+#if (!requireNamespace("BiocManager", quietly=TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("UCell")
+
+#remotes::install_github("mojaveazure/seurat-disk")
+#library(SeuratDisk)
+
+
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(UCell)
+set.seed(42)
+```
+
+
+Get object with pre-processed CosMx data from: https://zenodo.org/records/14330691
+Direct download link: https://zenodo.org/records/14330691/files/CosMx_BCC_Yerly_2024.rds?download=1
+
+NOTE: the object on Zenodo already contains meta-data after processing (e.g. predicted cell types, homotypic/heterotypic cancer cells, MP scores, etc.). Since no cells were removed, and transcript data were not subject to transformation, we can start analyses from this object, ignoring the meta-data.
+
+```{r}
+data_dir <- "./"
+seu.obj <- readRDS(paste0(data_dir,"../Yerly_BCC_wounding/CosMx/CosMx_BCC_Yerly_2024.rds"))
+```
+
+```{r}
+pal <- c("#F2E9E4","#C9ADA7","#9A8C98","#4A4E69")
+
+seu.obj$Patient_ID <- factor(seu.obj$Patient_ID, levels=c("PatientA","PatientB","PatientC","PatientD"))
+
+Idents(seu.obj) <- "Patient_ID"
+VlnPlot(seu.obj, features="nFeature_Nanostring", pt.size = 0, log = TRUE, cols=pal)
+VlnPlot(seu.obj, features="nFeature_Nanostring", pt.size = 0, log = FALSE, cols=pal)
+ggsave("plots/cosmx_nfeatures.pdf", height=3.5, width=4.5)
+```
+Signatures
+```{r}
+sigs <- list()
+sigs$Fibroblast <- c("COL1A1","COL1A2","COL3A1","DCN","LUM","THY1","KRT18-","KRT19-")
+sigs$Keratinocyte <- c("KRT5","KRT14","KRT1","KRT10","KRTDAP")
+```
+
+Run UCell
+```{r}
+library(UCell)
+seu.obj <- AddModuleScore_UCell(seu.obj, features=sigs, name="", ncores=8, maxRank = 400)
+```
+
+
+Plot MP activity for specific FOV
+
+```{r}
+# Set your desired image and FOV 
+
+use_fov <- 45 # FOV desired 
+use_slide_metadata <- unique(seu.obj@meta.data$Run_Tissue_name.x)[1] # Slide desired, as named in the metadata column ‘Run_Tissue_name’ 
+use_slide_image <- Images(seu.obj)[1] # Slide desired, as named in images 
+
+cells_of_interest <- seu.obj$id[(seu.obj$fov == use_fov) & ( seu.obj$Run_Tissue_name.x == use_slide_metadata)] 
+centroid_data <- seu.obj@images[[use_slide_image]]$centroids 
+zoom_fov <- apply(centroid_data@coords[centroid_data@cells %in% cells_of_interest,], 2, range)
+
+cols = c("white", "darkred")
+
+a <- ImageFeaturePlot(seu.obj,
+                        fov = use_slide_image,
+                        features = "Fibroblast",
+                        border.color = "black",
+                        cols = cols,
+                        border.size = 0.05,
+                        dark.background = F,
+                        coord.fixed = T,
+                        min.cutoff = 0, max.cutoff = 1) +
+  xlim(zoom_fov[, 2]) + ylim(zoom_fov[, 1]) + coord_flip() + theme(aspect.ratio = 1)
+
+# Keratinocytes
+
+cols = c("white", "darkblue")
+
+b <- ImageFeaturePlot(seu.obj,
+                        fov = use_slide_image,
+                        features = "Keratinocyte",
+                        border.color = "black",
+                        cols = cols,
+                        border.size = 0.1,
+                        dark.background = F,
+                        coord.fixed = T,
+                        min.cutoff = 0, max.cutoff = 1) +
+  xlim(zoom_fov[, 2]) + ylim(zoom_fov[, 1]) + coord_flip() + theme(aspect.ratio = 1)
+
+
+a | b
+
+ggsave("plots/cosmx_sigs_slide1_fov45.pdf", height=4, width=9)
+```
+
+```{r}
+# Set your desired image and FOV 
+
+use_fov <- 15 # FOV desired 
+use_slide_metadata <- unique(seu.obj@meta.data$Run_Tissue_name.x)[1] # Slide desired, as named in the metadata column ‘Run_Tissue_name’ 
+use_slide_image <- Images(seu.obj)[1] # Slide desired, as named in images 
+
+cells_of_interest <- seu.obj$id[(seu.obj$fov == use_fov) & ( seu.obj$Run_Tissue_name.x == use_slide_metadata)] 
+centroid_data <- seu.obj@images[[use_slide_image]]$centroids 
+zoom_fov <- apply(centroid_data@coords[centroid_data@cells %in% cells_of_interest,], 2, range)
+
+cols = c("white", "darkred")
+
+a <- ImageFeaturePlot(seu.obj,
+                        fov = use_slide_image,
+                        features = "Fibroblast",
+                        border.color = "black",
+                        cols = cols,
+                        border.size = 0.05,
+                        dark.background = F,
+                        coord.fixed = T,
+                        min.cutoff = 0, max.cutoff = 1) +
+  xlim(zoom_fov[, 2]) + ylim(zoom_fov[, 1]) + coord_flip() + theme(aspect.ratio = 1)
+
+# Keratinocytes
+
+cols = c("white", "darkblue")
+
+b <- ImageFeaturePlot(seu.obj,
+                        fov = use_slide_image,
+                        features = "Keratinocyte",
+                        border.color = "black",
+                        cols = cols,
+                        border.size = 0.1,
+                        dark.background = F,
+                        coord.fixed = T,
+                        min.cutoff = 0, max.cutoff = 1) +
+  xlim(zoom_fov[, 2]) + ylim(zoom_fov[, 1]) + coord_flip() + theme(aspect.ratio = 1)
+
+
+a | b
+
+ggsave("plots/cosmx_sigs_slide1_fov15.pdf", height=4, width=9)
+```
+
