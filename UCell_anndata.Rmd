@@ -1,0 +1,74 @@
+---
+title: Comparing UCell outputs from R and python
+author: 
+- Massimo Andreatta^[massimo.andreatta@unige.ch]
+- Santiago Carmona^[santiago.carmona@unige.ch]
+date: "08/01/2026"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'UCell_anndata.html'))})
+#output: html_notebook
+---
+
+This notebook reproduces results from pyUCell with the R version of UCell. We will use a test object from scanpy, also used in pyUCell's demo.
+
+```{r message=F, warning=F}
+library(UCell)
+library(reticulate)
+library(zellkonverter)
+library(Seurat)
+library(ggplot2)
+```
+
+Download anndata object from scanpy. This requires "reticulate" to run python from within R. Alternatively, you may download and store the `pbmc3k.h5ad` from a python session.
+```{r}
+do_download <- FALSE
+
+if (do_download) {
+  use_python("/usr/bin/python3", required = TRUE)
+  sc <- import("scanpy")
+  
+  adata <- sc$datasets$pbmc3k()
+  adata$write("pbmc3k.h5ad")
+}
+```
+
+Read object into R. For conversion, we will use `zellkoverter`; first converts an ".h5ad" object to "sce" format, then we can convert from "sce" to "Seurat". Conversions between R and python objects are known to be clunky.
+```{r}
+sce <- readH5AD("pbmc3k.h5ad")
+pbmc <- as.Seurat(sce, counts="X", data=NULL)
+
+pbmc
+```
+Define two simple signatures.
+```{r}
+signatures = list()
+signatures[['T_cell']] <- c('CD3D', 'CD3E', 'CD2')
+signatures[['B_cell']] <- c('MS4A1', 'CD79A', 'CD79B')
+```
+
+Run UCell on the PBMC object to evaluate the T cell and B cell signatures.
+```{r}
+pbmc <- AddModuleScore_UCell(pbmc, features = signatures)
+```
+
+Have a look at the results in metadata.
+```{r}
+head(pbmc[[]])
+```
+
+Calculate low-dimensional embeddings, to see the signature activity in UMAP space.
+```{r}
+pbmc <- pbmc |> NormalizeData() |> FindVariableFeatures(nfeatures = 500) |>
+  ScaleData() |> RunPCA(npcs = 10) |> RunUMAP(dims = 1:10)
+```
+
+Plot UCell scores in UMAP space
+```{r fig.width=10, fig.height=5}
+FeaturePlot(pbmc, features=c("T_cell_UCell","B_cell_UCell")) & theme(aspect.ratio = 1)
+```
+
+
+
